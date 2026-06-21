@@ -191,7 +191,7 @@ function EmployeeForm({ employeeId, onSave, onCancel }: { employeeId: string | n
           <label className="label">{t('employees.netSalary')}</label>
           <div className="input mt-1 bg-slate-50 dark:bg-slate-700">{formatCurrency(netSalary, 'EGP', 'en')}</div>
         </div>
-        <Select label={t('app.status')} value={status} onChange={(e) => setStatus(e.target.value)}
+        <Select label={t('app.status')} value={status} onChange={(e) => setStatus(e.target.value as 'active' | 'on_leave' | 'terminated')}
           options={[
             { value: 'active', label: t('employees.active') },
             { value: 'on_leave', label: t('employees.onLeave') },
