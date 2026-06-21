@@ -12,13 +12,13 @@ import type {
 
 const uid = () => crypto.randomUUID();
 
-function daysAgo(n) {
+function daysAgo(n: number) {
   const d = new Date();
   d.setDate(d.getDate() - n);
   return d.toISOString();
 }
 
-function randInt(min, max) {
+function randInt(min: number, max: number) {
   return Math.floor(Math.random() * (max - min + 1)) + min;
 }
 
