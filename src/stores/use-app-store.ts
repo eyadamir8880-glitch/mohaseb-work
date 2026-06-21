@@ -123,7 +123,7 @@ interface AppStore {
   updateChartOfAccount: (id: string, data: Partial<ChartOfAccount>) => void;
   deleteChartOfAccount: (id: string) => void;
 
-  addNotification: (notification: Omit<Notification, 'id' | 'createdAt'>) => Notification;
+  addNotification: (notification: Omit<Notification, 'id' | 'createdAt'>) => void;
   markNotificationRead: (id: string) => void;
   markAllNotificationsRead: () => void;
   clearNotifications: () => void;
