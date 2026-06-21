@@ -185,7 +185,7 @@ function POForm({ poId, onSave, onCancel }: { poId: string | null; onSave: () =>
           options={store.suppliers.map(s => ({ value: s.id, label: language === 'ar' ? s.nameAr : s.name }))} placeholder={t('app.search')} />
         <Input label={t('purchaseOrders.orderDate')} type="date" value={orderDate} onChange={(e) => setOrderDate(e.target.value)} />
         <Input label={t('purchaseOrders.expectedDate')} type="date" value={expectedDate} onChange={(e) => setExpectedDate(e.target.value)} />
-        <Select label={t('app.status')} value={status} onChange={(e) => setStatus(e.target.value)}
+        <Select label={t('app.status')} value={status} onChange={(e) => setStatus(e.target.value as 'draft' | 'sent' | 'partially_received' | 'received' | 'paid' | 'cancelled')}
           options={[
             { value: 'draft', label: t('purchaseOrders.status.draft') },
             { value: 'sent', label: t('purchaseOrders.status.sent') },

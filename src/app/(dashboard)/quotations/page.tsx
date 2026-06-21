@@ -164,7 +164,7 @@ function QuotationForm({ quotationId, onSave, onCancel }: { quotationId: string 
           options={store.customers.map(c => ({ value: c.id, label: language === 'ar' ? c.nameAr : c.name }))} placeholder={t('app.search')} />
         <Input label={t('invoices.issueDate')} type="date" value={issueDate} onChange={(e) => setIssueDate(e.target.value)} />
         <Input label={t('quotations.expiryDate')} type="date" value={expiryDate} onChange={(e) => setExpiryDate(e.target.value)} />
-        <Select label={t('app.status')} value={status} onChange={(e) => setStatus(e.target.value)}
+        <Select label={t('app.status')} value={status} onChange={(e) => setStatus(e.target.value as 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired' | 'converted')}
           options={[
             { value: 'draft', label: t('quotations.status.draft') },
             { value: 'sent', label: t('quotations.status.sent') },
