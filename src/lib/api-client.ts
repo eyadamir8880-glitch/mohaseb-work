@@ -101,12 +101,12 @@ async function supabaseGet<T>(endpoint: string, params?: Record<string, any>): P
   if (!table) return [] as any;
 
   if (table === 'categories' && endpoint.includes('productCategories')) {
-    let query = supabaseClient!.from('categories').select('*').eq('type', 'product');
+    let query = (supabaseClient! as any).from('categories').select('*').eq('type', 'product');
     const all = await query;
     return snakeToCamel(all.data || []) as any;
   }
   if (table === 'categories' && endpoint.includes('treasuryCategories')) {
-    let query = supabaseClient!.from('categories').select('*').in('type', ['income', 'expense']);
+    let query = (supabaseClient! as any).from('categories').select('*').in('type', ['income', 'expense']);
     const all = await query;
     return snakeToCamel(all.data || []) as any;
   }
@@ -115,7 +115,7 @@ async function supabaseGet<T>(endpoint: string, params?: Record<string, any>): P
     return supabaseGetDashboard() as any;
   }
 
-  let query = supabaseClient!.from(table).select('*');
+  let query = (supabaseClient! as any).from(table).select('*');
 
   if (params) {
     if (params.search) {
@@ -209,7 +209,7 @@ export const apiClient = {
           .single();
         if (error) throw { code: 'SUPABASE_ERROR', message: error.message };
 
-        await (supabaseClient!.from('audit_logs') as any).insert({
+        await (supabaseClient! as any).from('audit_logs').insert({
           timestamp: new Date().toISOString(),
           user: 'Admin',
           action: 'created',
@@ -243,7 +243,7 @@ export const apiClient = {
           return responseInterceptor({ data: data as any, status: 200, message: 'Updated successfully' });
         }
 
-        const { data: oldData } = await supabaseClient!.from(table).select('*').eq('id', id).single();
+        const { data: oldData } = await (supabaseClient! as any).from(table).select('*').eq('id', id).single();
 
         const { data: updated, error } = await supabaseClient!
           .from(table)
@@ -253,7 +253,7 @@ export const apiClient = {
           .single();
         if (error) throw { code: 'SUPABASE_ERROR', message: error.message };
 
-        await supabaseClient!.from('audit_logs').insert({
+        await (supabaseClient! as any).from('audit_logs').insert({
           timestamp: new Date().toISOString(),
           user: 'Admin',
           action: 'updated',
@@ -287,12 +287,12 @@ export const apiClient = {
           return responseInterceptor({ data: null as any, status: 200, message: 'Deleted successfully' });
         }
 
-        const { data: oldData } = await supabaseClient!.from(table).select('*').eq('id', id).single();
+        const { data: oldData } = await (supabaseClient! as any).from(table).select('*').eq('id', id).single();
 
-        const { error } = await supabaseClient!.from(table).delete().eq('id', id);
+        const { error } = await (supabaseClient! as any).from(table).delete().eq('id', id);
         if (error) throw { code: 'SUPABASE_ERROR', message: error.message };
 
-        await supabaseClient!.from('audit_logs').insert({
+        await (supabaseClient! as any).from('audit_logs').insert({
           timestamp: new Date().toISOString(),
           user: 'Admin',
           action: 'deleted',
@@ -342,11 +342,11 @@ async function supabaseGetDashboard(): Promise<any> {
   if (!supabaseClient) return {};
 
   const [invoicesRes, expensesRes, incomesRes, accountsRes, productsRes] = await Promise.all([
-    supabaseClient.from('invoices').select('grand_total, paid_amount, status'),
-    supabaseClient.from('treasury_transactions').select('amount, type').eq('type', 'expense'),
-    supabaseClient.from('treasury_transactions').select('amount, type').eq('type', 'income'),
-    supabaseClient.from('treasury_accounts').select('balance'),
-    supabaseClient.from('products').select('stock, low_stock_threshold, track_inventory').eq('track_inventory', true),
+    (supabaseClient as any).from('invoices').select('grand_total, paid_amount, status'),
+    (supabaseClient as any).from('treasury_transactions').select('amount, type').eq('type', 'expense'),
+    (supabaseClient as any).from('treasury_transactions').select('amount, type').eq('type', 'income'),
+    (supabaseClient as any).from('treasury_accounts').select('balance'),
+    (supabaseClient as any).from('products').select('stock, low_stock_threshold, track_inventory').eq('track_inventory', true),
   ]);
 
   const totalRevenue = (incomesRes.data || []).reduce((s: number, t: any) => s + t.amount, 0);
@@ -358,7 +358,7 @@ async function supabaseGetDashboard(): Promise<any> {
     .reduce((s: number, i: any) => s + (i.grand_total - (i.paid_amount || 0)), 0);
   const lowStockCount = (productsRes.data || []).filter((p: any) => p.stock <= p.low_stock_threshold).length;
 
-  const recentLogs = await supabaseClient.from('audit_logs').select('*').order('created_at', { ascending: false }).limit(20);
+  const recentLogs = await (supabaseClient as any).from('audit_logs').select('*').order('created_at', { ascending: false }).limit(20);
 
   return {
     totalRevenue,
