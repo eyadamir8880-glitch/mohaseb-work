@@ -209,7 +209,7 @@ export const apiClient = {
           .single();
         if (error) throw { code: 'SUPABASE_ERROR', message: error.message };
 
-        await supabaseClient!.from('audit_logs').insert({
+        await (supabaseClient!.from('audit_logs') as any).insert({
           timestamp: new Date().toISOString(),
           user: 'Admin',
           action: 'created',
