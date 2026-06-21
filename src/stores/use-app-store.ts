@@ -218,7 +218,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
           paymentMethods: stateData.paymentMethods.length > 0 ? stateData.paymentMethods : [...PAYMENT_METHODS],
           isInitialized: true,
           lastSaveTime: Date.now(),
-        });
+        } as any);
 
         get().addAuditLog({
           timestamp: new Date().toISOString(), user: 'System', action: 'created',
@@ -238,7 +238,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
     set({
       ...data, settings: settingsArray, paymentMethods: PAYMENT_METHODS,
       isInitialized: true,
-    });
+    } as any);
     get().addAuditLog({
       timestamp: new Date().toISOString(), user: 'System', action: 'created',
       module: 'system', recordId: 'init', oldValues: null,
@@ -266,7 +266,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
         oldValues: null, newValues: { action: 'Application data reset to demo' },
         ip: '127.0.0.1', createdAt: new Date().toISOString(),
       }],
-    });
+    } as any);
   },
 
   getStateSnapshot: () => {
