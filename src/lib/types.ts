@@ -408,8 +408,8 @@ export interface AuditLog {
   action: 'created' | 'updated' | 'deleted' | 'viewed' | 'exported' | 'imported' | 'printed' | 'paid' | 'received' | 'transferred' | 'reconciled';
   module: string;
   recordId: string;
-  oldValues: Record<string, any> | null;
-  newValues: Record<string, any> | null;
+  oldValues: Record<string, any> | undefined | null;
+  newValues: Record<string, any> | undefined | null;
   ip: string;
   createdAt: string;
 }
