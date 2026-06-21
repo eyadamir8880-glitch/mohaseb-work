@@ -524,7 +524,13 @@
     "selectFile": "اختيار ملف",
     "expectedColumns": "الأعمدة المتوقعة",
     "productNumber": "رقم المنتج",
-    "sellingPrice": "سعر البيع"
+    "sellingPrice": "سعر البيع",
+    "missingSku": "رقم المنتج مفقود",
+    "missingName": "الاسم مفقود",
+    "missingPrice": "السعر مفقود",
+    "duplicateSku": "رقم المنتج مكرر",
+    "selectAll": "تحديد الكل",
+    "importSelected": "استيراد المحدد"
   },
   "paymentMethods": {
     "cash": "نقداً",

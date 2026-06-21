@@ -524,7 +524,13 @@
     "selectFile": "Select File",
     "expectedColumns": "Expected columns",
     "productNumber": "Product Number",
-    "sellingPrice": "Selling Price"
+    "sellingPrice": "Selling Price",
+    "missingSku": "Missing SKU",
+    "missingName": "Missing Name",
+    "missingPrice": "Missing Price",
+    "duplicateSku": "Duplicate SKU",
+    "selectAll": "Select All",
+    "importSelected": "Import Selected"
   },
   "paymentMethods": {
     "cash": "Cash",

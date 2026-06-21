@@ -23,7 +23,11 @@ export default function ProductsPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [showDeleteAll, setShowDeleteAll] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [importStep, setImportStep] = useState<'upload' | 'preview' | 'result'>('upload');
   const [importing, setImporting] = useState(false);
+  const [parsedRows, setParsedRows] = useState<{
+    sku: string; name: string; price: number; valid: boolean; reason: string; selected: boolean; rowIndex: number;
+  }[]>([]);
   const [importResult, setImportResult] = useState<{ imported: number; skipped: number; errors: string[] } | null>(null);
   const [form, setForm] = useState({
     name: '', nameAr: '', sku: '', barcode: '', description: '',
@@ -113,56 +117,77 @@ export default function ProductsPage() {
     setShowDeleteAll(false);
   };
 
-  const handleImport = async (file: File) => {
+  const getCol = (row: any, ...keys: string[]) => {
+    const rowKeys = Object.keys(row);
+    for (const k of keys) {
+      const match = rowKeys.find(rk => rk.toLowerCase() === k.toLowerCase());
+      if (match && row[match]) return String(row[match]).trim();
+    }
+    return '';
+  };
+
+  const parseFile = async (file: File) => {
     setImporting(true);
-    setImportResult(null);
+    setImportStep('upload');
     try {
       const XLSX = await import('xlsx');
       const buffer = await readFileAsArrayBuffer(file);
       const workbook = XLSX.read(buffer, { type: 'array' });
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
       const rows: any[] = XLSX.utils.sheet_to_json(sheet);
-      let imported = 0;
-      let skipped = 0;
-      const errors: string[] = [];
-      const allSkus = new Set(products.map(p => p.sku.toLowerCase()));
-      const getCol = (row: any, ...keys: string[]) => {
-        const rowKeys = Object.keys(row);
-        for (const k of keys) {
-          const match = rowKeys.find(rk => rk.toLowerCase() === k.toLowerCase());
-          if (match && row[match]) return String(row[match]).trim();
-        }
-        return '';
-      };
-      for (let i = 0; i < rows.length; i++) {
-        try {
-          const row = rows[i];
-          const sku = getCol(row, 'product number', 'product_number', 'sku', 'productNumber', 'item number', 'item_number');
-          const name = getCol(row, 'name', 'product name', 'product_name', 'productName');
-          const rawPrice = getCol(row, 'selling price', 'selling_price', 'sellingPrice', 'price', 'unit price', 'unit_price').replace(/[^0-9.]/g, '');
-          if (!sku || !name || !rawPrice) { skipped++; continue; }
-          if (allSkus.has(sku.toLowerCase())) { skipped++; continue; }
-          store.addProduct({
-            name, nameAr: '', sku, barcode: '', description: '', descriptionAr: '',
-            categoryId: '', purchasePrice: 0,
-            sellingPrice: parseFloat(rawPrice) || 0,
-            unitOfMeasure: 'piece', baseUnit: 'piece',
-            conversionRate: 1, trackInventory: true,
-            stock: 0, lowStockThreshold: 0, reorderPoint: 0,
-            imageUrl: '', hasVariants: false, alternateSkus: [],
-          });
-          allSkus.add(sku.toLowerCase());
-          imported++;
-        } catch (e: any) {
-          errors.push(`Row ${i + 2}: ${e.message}`);
-        }
-      }
-      setImportResult({ imported, skipped, errors });
+      const existingSkus = new Set(products.map(p => p.sku.toLowerCase()));
+      const parsed = rows.map((row, i) => {
+        const sku = getCol(row, 'product number', 'product_number', 'sku', 'productNumber', 'item number', 'item_number');
+        const name = getCol(row, 'name', 'product name', 'product_name', 'productName');
+        const rawPrice = getCol(row, 'selling price', 'selling_price', 'sellingPrice', 'price', 'unit price', 'unit_price').replace(/[^0-9.]/g, '');
+        const price = parseFloat(rawPrice) || 0;
+        let valid = true;
+        let reason = '';
+        if (!sku) { valid = false; reason = t('import.missingSku'); }
+        else if (!name) { valid = false; reason = t('import.missingName'); }
+        else if (!rawPrice) { valid = false; reason = t('import.missingPrice'); }
+        else if (existingSkus.has(sku.toLowerCase())) { valid = false; reason = t('import.duplicateSku'); }
+        return { sku, name, price, valid, reason, selected: valid, rowIndex: i };
+      });
+      setParsedRows(parsed);
+      setImportStep('preview');
     } catch (e: any) {
       setImportResult({ imported: 0, skipped: 0, errors: [e.message] });
+      setImportStep('result');
     } finally {
       setImporting(false);
     }
+  };
+
+  const toggleRow = (index: number) => {
+    setParsedRows(prev => prev.map((r, i) => i === index ? { ...r, selected: !r.selected } : r));
+  };
+
+  const toggleSelectAll = () => {
+    const allSelected = parsedRows.every(r => r.selected || !r.valid);
+    setParsedRows(prev => prev.map(r => r.valid ? { ...r, selected: !allSelected } : r));
+  };
+
+  const executeImport = () => {
+    const selected = parsedRows.filter(r => r.selected);
+    let imported = 0;
+    const errors: string[] = [];
+    for (const row of selected) {
+      try {
+        store.addProduct({
+          name: row.name, nameAr: '', sku: row.sku, barcode: '', description: '', descriptionAr: '',
+          categoryId: '', purchasePrice: 0, sellingPrice: row.price,
+          unitOfMeasure: 'piece', baseUnit: 'piece', conversionRate: 1,
+          trackInventory: true, stock: 0, lowStockThreshold: 0, reorderPoint: 0,
+          imageUrl: '', hasVariants: false, alternateSkus: [],
+        });
+        imported++;
+      } catch (e: any) {
+        errors.push(`${row.sku}: ${e.message}`);
+      }
+    }
+    setImportResult({ imported, skipped: parsedRows.length - selected.length, errors });
+    setImportStep('result');
   };
 
   const getStockColor = (p: Product) => {
@@ -440,34 +465,16 @@ export default function ProductsPage() {
 
       {showImport && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="fixed inset-0 bg-black/50" onClick={() => { if (!importing) { setShowImport(false); setImportResult(null); } }} />
-          <div className="relative bg-background rounded-lg shadow-xl w-full max-w-lg mx-4 p-6">
+          <div className="fixed inset-0 bg-black/50" onClick={() => { if (!importing) { setShowImport(false); setImportResult(null); setImportStep('upload'); setParsedRows([]); } }} />
+          <div className="relative bg-background rounded-lg shadow-xl w-full max-w-3xl mx-4 max-h-[90vh] overflow-y-auto p-6">
             <h2 className="text-lg font-semibold mb-4">{t('import.title')}</h2>
-            {importResult ? (
-              <div className="space-y-3">
-                <p className="text-sm text-muted-foreground">{t('import.importComplete')}</p>
-                <div className="grid grid-cols-2 gap-2 text-sm">
-                  <span>{t('import.imported')}: <strong>{importResult.imported}</strong></span>
-                  <span>{t('import.skipped')}: <strong>{importResult.skipped}</strong></span>
-                </div>
-                {importResult.errors.length > 0 && (
-                  <div>
-                    <p className="text-sm text-red-500 mb-1">{t('import.errors')}:</p>
-                    {importResult.errors.slice(0, 5).map((e, i) => (
-                      <p key={i} className="text-xs text-red-400">- {e}</p>
-                    ))}
-                  </div>
-                )}
-                <div className="flex justify-end">
-                  <Button onClick={() => { setShowImport(false); setImportResult(null); }}>{t('app.close')}</Button>
-                </div>
-              </div>
-            ) : (
+
+            {importStep === 'upload' && (
               <div className="space-y-4">
                 <p className="text-sm text-muted-foreground">{t('import.dragDrop')}</p>
                 <div className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover:bg-muted/50"
                   onDragOver={(e) => e.preventDefault()}
-                  onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) handleImport(f); }}>
+                  onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) parseFile(f); }}>
                   <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
                   <p className="text-sm text-muted-foreground">{t('import.dragDrop')}</p>
                   <input
@@ -475,7 +482,7 @@ export default function ProductsPage() {
                     accept=".xlsx,.xls,.csv"
                     className="hidden"
                     id="excel-upload"
-                    onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImport(f); }}
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) parseFile(f); }}
                   />
                   <Button variant="outline" className="mt-3" onClick={() => document.getElementById('excel-upload')?.click()}>
                     {t('import.selectFile')}
@@ -490,8 +497,85 @@ export default function ProductsPage() {
                   </ul>
                 </div>
                 {importing && <p className="text-sm text-center text-primary">{t('import.processing')}</p>}
+                <div className="flex justify-end">
+                  <Button variant="outline" onClick={() => { setShowImport(false); setImportResult(null); setImportStep('upload'); setParsedRows([]); }}>{t('app.cancel')}</Button>
+                </div>
+              </div>
+            )}
+
+            {importStep === 'preview' && !importing && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    {parsedRows.filter(r => r.valid).length} {t('import.valid')} / {parsedRows.length} {t('import.totalRows').toLowerCase()}
+                  </p>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input type="checkbox" checked={parsedRows.filter(r => r.valid).every(r => r.selected)} onChange={toggleSelectAll} className="h-4 w-4" />
+                    {t('import.selectAll')}
+                  </label>
+                </div>
+                <div className="max-h-64 overflow-y-auto border rounded-lg">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b bg-muted/50">
+                        <th className="w-10 p-2 text-center">
+                          <input type="checkbox" checked={parsedRows.filter(r => r.valid).every(r => r.selected)} onChange={toggleSelectAll} className="h-4 w-4" />
+                        </th>
+                        <th className="text-left p-2">SKU</th>
+                        <th className="text-left p-2">{t('import.productName')}</th>
+                        <th className="text-right p-2">{t('import.price')}</th>
+                        <th className="text-center p-2">{t('app.status')}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {parsedRows.map((row, i) => (
+                        <tr key={i} className={`border-b hover:bg-muted/50 ${!row.valid ? 'opacity-60' : ''}`}>
+                          <td className="p-2 text-center">
+                            <input type="checkbox" checked={row.selected} disabled={!row.valid}
+                              onChange={() => toggleRow(i)} className="h-4 w-4" />
+                          </td>
+                          <td className="p-2 font-mono text-xs">{row.sku || '-'}</td>
+                          <td className="p-2">{row.name || '-'}</td>
+                          <td className="p-2 text-right">{row.price > 0 ? formatCurrency(row.price, 'EGP', language) : '-'}</td>
+                          <td className="p-2 text-center">
+                            {row.valid ? (
+                              <Badge variant="green">{t('import.valid')}</Badge>
+                            ) : (
+                              <span className="text-xs text-red-500">{row.reason}</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
                 <div className="flex justify-end gap-2">
-                  <Button variant="outline" onClick={() => { setShowImport(false); setImportResult(null); }}>{t('app.cancel')}</Button>
+                  <Button variant="outline" onClick={() => { setImportStep('upload'); setParsedRows([]); }}>{t('import.importAnother')}</Button>
+                  <Button onClick={executeImport} disabled={!parsedRows.some(r => r.selected)}>
+                    {t('import.importSelected')} ({parsedRows.filter(r => r.selected).length})
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {importStep === 'result' && importResult && (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">{t('import.importComplete')}</p>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <span>{t('import.imported')}: <strong>{importResult.imported}</strong></span>
+                  <span>{t('import.skipped')}: <strong>{importResult.skipped}</strong></span>
+                </div>
+                {importResult.errors.length > 0 && (
+                  <div>
+                    <p className="text-sm text-red-500 mb-1">{t('import.errors')}:</p>
+                    {importResult.errors.slice(0, 5).map((e, i) => (
+                      <p key={i} className="text-xs text-red-400">- {e}</p>
+                    ))}
+                  </div>
+                )}
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => { setImportStep('upload'); setImportResult(null); setParsedRows([]); }}>{t('import.importAnother')}</Button>
+                  <Button onClick={() => { setShowImport(false); setImportResult(null); setImportStep('upload'); setParsedRows([]); }}>{t('app.close')}</Button>
                 </div>
               </div>
             )}
