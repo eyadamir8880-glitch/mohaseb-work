@@ -1,0 +1,309 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Cairo:wght@300;400;500;600;700&family=Tajawal:wght@300;400;500;700&display=swap');
+
+@layer base {
+  * {
+    @apply border-slate-200 dark:border-slate-700;
+    transition: background-color 200ms ease, color 200ms ease, border-color 200ms ease;
+  }
+
+  body {
+    @apply bg-white text-slate-900 dark:bg-slate-950 dark:text-slate-100;
+    font-family: 'Inter', sans-serif;
+  }
+
+  [dir="rtl"] body,
+  [dir="rtl"] * {
+    font-family: 'Cairo', 'Tajawal', sans-serif;
+  }
+
+  :root {
+    --primary: 234 88 12; /* orange-700 for warm theme */
+    --primary-foreground: 255 255 255;
+  }
+}
+
+@layer components {
+  .sidebar-link {
+    @apply flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors;
+    @apply text-slate-600 hover:bg-slate-100 hover:text-slate-900;
+    @apply dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100;
+  }
+
+  .sidebar-link.active {
+    @apply bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-400;
+  }
+
+  .card {
+    @apply rounded-xl border bg-white p-6 shadow-sm;
+    @apply dark:bg-slate-900 dark:border-slate-700;
+  }
+
+  .card-header {
+    @apply mb-4 flex items-center justify-between;
+  }
+
+  .card-title {
+    @apply text-lg font-semibold;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-colors;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500;
+    @apply disabled:pointer-events-none disabled:opacity-50;
+  }
+
+  .btn-primary {
+    @apply btn bg-blue-600 text-white hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600;
+  }
+
+  .btn-secondary {
+    @apply btn bg-slate-100 text-slate-900 hover:bg-slate-200;
+    @apply dark:bg-slate-800 dark:text-slate-100 dark:hover:bg-slate-700;
+  }
+
+  .btn-outline {
+    @apply btn border border-slate-300 bg-transparent hover:bg-slate-100;
+    @apply dark:border-slate-600 dark:hover:bg-slate-800;
+  }
+
+  .btn-danger {
+    @apply btn bg-red-600 text-white hover:bg-red-700;
+  }
+
+  .btn-success {
+    @apply btn bg-emerald-600 text-white hover:bg-emerald-700;
+  }
+
+  .btn-ghost {
+    @apply btn bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800;
+  }
+
+  .btn-sm {
+    @apply px-3 py-1.5 text-xs;
+  }
+
+  .btn-lg {
+    @apply px-6 py-3 text-base;
+  }
+
+  .btn-icon {
+    @apply btn p-2;
+  }
+
+  .input {
+    @apply flex h-10 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm;
+    @apply file:border-0 file:bg-transparent file:text-sm file:font-medium;
+    @apply placeholder:text-slate-400;
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:border-blue-500;
+    @apply disabled:cursor-not-allowed disabled:opacity-50;
+    @apply dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:placeholder:text-slate-500;
+  }
+
+  .label {
+    @apply text-sm font-medium text-slate-700 dark:text-slate-300;
+  }
+
+  .badge {
+    @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
+  }
+
+  .badge-green {
+    @apply badge bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200;
+  }
+
+  .badge-red {
+    @apply badge bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200;
+  }
+
+  .badge-yellow {
+    @apply badge bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200;
+  }
+
+  .badge-blue {
+    @apply badge bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200;
+  }
+
+  .badge-gray {
+    @apply badge bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-200;
+  }
+
+  .table-container {
+    @apply w-full overflow-auto rounded-xl border;
+    @apply dark:border-slate-700;
+  }
+
+  .table {
+    @apply w-full text-sm;
+  }
+
+  .table th {
+    @apply border-b bg-slate-50 px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500;
+    @apply dark:bg-slate-900 dark:text-slate-400;
+  }
+
+  .table td {
+    @apply border-b px-4 py-3;
+    @apply dark:border-slate-700;
+  }
+
+  .table tr {
+    @apply transition-colors hover:bg-slate-50 dark:hover:bg-slate-800/50;
+  }
+
+  .modal-backdrop {
+    @apply fixed inset-0 z-50 bg-black/50 backdrop-blur-sm;
+  }
+
+  .modal-content {
+    @apply fixed left-1/2 top-1/2 z-50 max-h-[85vh] w-full max-w-lg -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-xl border bg-white p-6 shadow-xl;
+    @apply dark:bg-slate-900 dark:border-slate-700;
+  }
+
+  .modal-content-wide {
+    @apply modal-content max-w-3xl;
+  }
+
+  .modal-content-full {
+    @apply modal-content max-w-5xl;
+  }
+
+  .page-header {
+    @apply mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between;
+  }
+
+  .page-title {
+    @apply text-2xl font-bold tracking-tight;
+  }
+
+  .skeleton {
+    @apply animate-pulse rounded bg-slate-200 dark:bg-slate-700;
+  }
+
+  .kpi-card {
+    @apply card flex flex-col gap-1;
+  }
+
+  .kpi-label {
+    @apply text-sm font-medium text-slate-500 dark:text-slate-400;
+  }
+
+  .kpi-value {
+    @apply text-2xl font-bold;
+  }
+
+  .kpi-change {
+    @apply text-xs font-medium;
+  }
+
+  .kpi-change.positive {
+    @apply text-emerald-600 dark:text-emerald-400;
+  }
+
+  .kpi-change.negative {
+    @apply text-red-600 dark:text-red-400;
+  }
+
+  /* Print styles */
+  @media print {
+    body {
+      background: white !important;
+      color: black !important;
+    }
+    
+    .no-print {
+      display: none !important;
+    }
+
+    .print-only {
+      display: block !important;
+    }
+
+    .print-force-light {
+      background: white !important;
+      color: black !important;
+    }
+
+    .print-force-light * {
+      color: black !important;
+      border-color: #e2e8f0 !important;
+    }
+
+    @page {
+      size: A4;
+      margin: 15mm;
+    }
+  }
+
+  .print-only {
+    display: none;
+  }
+
+  /* POS thermal receipt */
+  .receipt-80mm {
+    width: 80mm;
+    font-family: 'Courier New', monospace;
+    font-size: 10px;
+    line-height: 1.3;
+    padding: 5mm;
+  }
+}
+
+/* Animations */
+@keyframes slideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes shrink {
+  from { width: 100%; }
+  to { width: 0%; }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-slide-in {
+  animation: slideIn 0.3s ease-out;
+}
+
+.animate-shrink {
+  animation: shrink 4s linear forwards;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.2s ease-out;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.3s ease-out;
+}
+
+/* Scrollbar styles */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-slate-300 dark:bg-slate-600;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-slate-400 dark:bg-slate-500;
+}
