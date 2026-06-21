@@ -176,6 +176,7 @@
     "total": "Total",
     "subtotal": "Subtotal",
     "taxTotal": "Tax Total",
+    "addItem": "Add Item",
     "discountTotal": "Discount Total",
     "grandTotal": "Grand Total",
     "paidAmount": "Paid Amount",

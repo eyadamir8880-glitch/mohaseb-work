@@ -70,10 +70,10 @@ export default function DashboardPage() {
   }, [invoices, transactions, t, customers, locale]);
 
   const quickActions = [
-    { label: t.dashboard.newInvoice, icon: FileText, href: '/invoices/new', color: 'bg-blue-500' },
-    { label: t.dashboard.newCustomer, icon: UserPlus, href: '/customers/new', color: 'bg-green-500' },
-    { label: t.dashboard.newProduct, icon: Package, href: '/products/new', color: 'bg-purple-500' },
-    { label: t.dashboard.newTransaction, icon: ArrowRightLeft, href: '/treasury/new', color: 'bg-amber-500' },
+    { label: t.dashboard.newInvoice, icon: FileText, href: '/invoices', color: 'bg-blue-500' },
+    { label: t.dashboard.newCustomer, icon: UserPlus, href: '/customers', color: 'bg-green-500' },
+    { label: t.dashboard.newProduct, icon: Package, href: '/products', color: 'bg-purple-500' },
+    { label: t.dashboard.newTransaction, icon: ArrowRightLeft, href: '/treasury', color: 'bg-amber-500' },
   ];
 
   const kpiCards = [
