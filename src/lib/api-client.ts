@@ -637,7 +637,7 @@ function getDashboardData(): any {
   };
 }
 
-function createAuditLog(action: string, module: string, recordId: string | null, newValues: any, oldValues?: any): AuditLog {
+function createAuditLog(action: AuditLog['action'], module: string, recordId: string | null, newValues: any, oldValues?: any): AuditLog {
   return {
     id: crypto.randomUUID(),
     timestamp: new Date().toISOString(),
