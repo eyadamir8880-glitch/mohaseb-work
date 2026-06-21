@@ -236,7 +236,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       id: generateId(), key, value: String(value), updatedAt: new Date().toISOString(),
     }));
     set({
-      ...data, settings: settingsArray, paymentMethods: PAYMENT_METHODS as any[],
+      ...data, settings: settingsArray, paymentMethods: PAYMENT_METHODS,
       isInitialized: true,
     });
     get().addAuditLog({
@@ -252,7 +252,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
       id: generateId(), key, value: String(value), updatedAt: new Date().toISOString(),
     }));
     set({
-      ...data, settings: settingsArray, paymentMethods: PAYMENT_METHODS as any[],
+      ...data, settings: settingsArray, paymentMethods: PAYMENT_METHODS,
       notifications: [{
         id: generateId(), type: 'system', title: 'Data Reset', titleAr: 'إعادة تعيين البيانات',
         message: 'All demo data has been reset successfully',

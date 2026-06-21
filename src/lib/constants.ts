@@ -1,4 +1,6 @@
-export const PAYMENT_METHODS = [
+import type { PaymentMethod } from './types';
+
+export const PAYMENT_METHODS: PaymentMethod[] = [
   { id: 'cash', name: 'Cash', nameAr: 'نقداً', type: 'cash', accountHolder: '-', icon: 'wallet', isActive: true, isProtected: true, sortOrder: 1 },
   { id: 'bank', name: 'Bank Transfer', nameAr: 'تحويل بنكي', type: 'bank', accountHolder: '-', icon: 'landmark', isActive: true, isProtected: true, sortOrder: 2 },
   { id: 'card', name: 'Card', nameAr: 'بطاقة', type: 'card', accountHolder: '-', icon: 'credit_card', isActive: true, isProtected: true, sortOrder: 3 },
