@@ -183,7 +183,7 @@ function AssetForm({ assetId, onSave, onCancel }: { assetId: string | null; onSa
         <Input label={t('assets.purchaseCost')} type="number" value={purchaseCost} onChange={(e) => setPurchaseCost(e.target.value)} />
         <Input label={t('assets.salvageValue')} type="number" value={salvageValue} onChange={(e) => setSalvageValue(e.target.value)} />
         <Input label={t('assets.usefulLife')} type="number" value={usefulLife} onChange={(e) => setUsefulLife(e.target.value)} />
-        <Select label={t('assets.depreciationMethod')} value={depreciationMethod} onChange={(e) => setDepreciationMethod(e.target.value)}
+        <Select label={t('assets.depreciationMethod')} value={depreciationMethod} onChange={(e) => setDepreciationMethod(e.target.value as 'straight_line' | 'declining_balance')}
           options={[
             { value: 'straight_line', label: t('assets.straightLine') },
             { value: 'declining_balance', label: t('assets.decliningBalance') },
