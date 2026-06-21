@@ -202,7 +202,7 @@ export const apiClient = {
         if (!table || table === 'categories' || endpoint.includes('dashboard')) {
           return responseInterceptor({ data: data as any, status: 201, message: 'Created successfully' });
         }
-        const { data: inserted, error } = await supabaseClient!
+        const { data: inserted, error } = await (supabaseClient! as any)
           .from(table)
           .insert(camelToSnake(data))
           .select()
@@ -245,7 +245,7 @@ export const apiClient = {
 
         const { data: oldData } = await (supabaseClient! as any).from(table).select('*').eq('id', id).single();
 
-        const { data: updated, error } = await supabaseClient!
+        const { data: updated, error } = await (supabaseClient! as any)
           .from(table)
           .update(camelToSnake(data))
           .eq('id', id)
@@ -321,7 +321,7 @@ export const apiClient = {
     if (isSupabaseConfigured && supabaseClient) {
       const file = formData.get('file') as File;
       if (file) {
-        const { data, error } = await supabaseClient!.storage
+        const { data, error } = await (supabaseClient! as any).storage
           .from('uploads')
           .upload(`imports/${Date.now()}_${file.name}`, file);
         if (error) throw errorInterceptor({ code: 'UPLOAD_FAILED', message: error.message });
