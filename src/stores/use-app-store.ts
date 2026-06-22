@@ -378,7 +378,7 @@ export const useAppStore = create<AppStore>()(
     if (isSupabaseConfigured) {
       try {
         const supabase = getSupabase();
-        supabase.from('products').insert(products).then(() => {}).catch(() => {});
+        (supabase as any).from('products').insert(products).then(() => {}).catch(() => {});
       } catch {}
     }
     return products;
