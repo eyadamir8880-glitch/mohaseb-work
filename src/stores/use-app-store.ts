@@ -204,8 +204,8 @@ export const useAppStore = create<AppStore>()(
   isInitialized: false,
   lastSaveTime: null,
 
-  setLanguage: (lang) => set({ language: lang }),
-  setTheme: (theme) => set({ theme }),
+  setLanguage: (lang: 'en' | 'ar') => set({ language: lang }),
+  setTheme: (theme: 'light' | 'dark') => set({ theme }),
   toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
 
   initializeStore: async () => {
