@@ -148,6 +148,7 @@ interface AppStore {
   addCustomPaymentMethod: (method: Omit<PaymentMethod, 'id' | 'isProtected'>) => PaymentMethod;
 
   addExternalPurchase: (data: Omit<ExternalPurchase, 'id' | 'createdAt'>) => ExternalPurchase;
+  bulkAddExternalPurchases: (data: Omit<ExternalPurchase, 'id' | 'createdAt'>[]) => ExternalPurchase[];
   deleteExternalPurchase: (id: string) => void;
   updateExternalPurchaseProductId: (id: string, productId: string | null) => void;
 
@@ -713,6 +714,15 @@ export const useAppStore = create<AppStore>()(
     get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'created', module: 'externalPurchases', recordId: purchase.id, oldValues: null, newValues: data, ip: '192.168.1.100' });
     syncToSupabase('post', 'externalPurchases', purchase);
     return purchase;
+  },
+  bulkAddExternalPurchases: (dataArr) => {
+    const purchases = dataArr.map(data => ({ ...data, id: generateId(), createdAt: new Date().toISOString() } as ExternalPurchase));
+    set((state) => ({ externalPurchases: [...purchases, ...state.externalPurchases] }));
+    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'created', module: 'externalPurchases', recordId: `${purchases.length} bulk`, oldValues: null, newValues: { count: purchases.length }, ip: '192.168.1.100' });
+    if (isSupabaseConfigured) {
+      try { (getSupabase() as any).from('externalPurchases').insert(purchases).then(() => {}).catch(() => {}); } catch {}
+    }
+    return purchases;
   },
   deleteExternalPurchase: (id) => {
     const old = get().externalPurchases.find(p => p.id === id);

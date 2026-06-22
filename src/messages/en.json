@@ -574,8 +574,8 @@
     "columnMapping": "Column Mapping",
     "autoDetected": "auto-detected",
     "preview": "Preview",
-    "matched": "Match → +{qty} stock",
-    "newProduct": "New → Create product",
+    "matched": "Match +{qty} stock",
+    "newProduct": "New - Create product",
     "skipped": "Skipped",
     "importItems": "Import {count} Items",
     "importComplete": "Import Complete",
@@ -637,3 +637,4 @@
     "searchPlaceholder": "Type to search..."
   }
 }
+

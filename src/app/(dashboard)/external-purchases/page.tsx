@@ -9,7 +9,6 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { DataTable } from '@/components/ui/data-table';
 import { readFileAsArrayBuffer } from '@/lib/utils';
-import JSZip from 'jszip';
 import * as XLSX from 'xlsx';
 
 export default function ExternalPurchasesPage() {
@@ -218,29 +217,13 @@ function ImportModal({ language, t, store, products, onClose, onResult }: {
   const handleFile = useCallback(async (f: File) => {
     setFile(f);
     const buffer = await readFileAsArrayBuffer(f);
-    const zip = await JSZip.loadAsync(buffer);
-
-    const photos: string[] = [];
-    const mediaFolder = zip.folder('xl/media');
-    if (mediaFolder) {
-      const mediaFiles = Object.keys(mediaFolder.files).sort();
-      for (const path of mediaFiles) {
-        const entry = mediaFolder.files[path];
-        if (!entry.dir) {
-          const blob = await entry.async('blob');
-          const url = URL.createObjectURL(blob);
-          photos.push(url);
-        }
-      }
-    }
-
     const workbook = XLSX.read(buffer, { type: 'array' });
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     const rows: any[] = XLSX.utils.sheet_to_json(sheet, { defval: '' });
 
     const mapped = rows.map((row: any, idx: number) => ({
       no: row['NO'] || idx + 1,
-      photo: photos[idx] || '',
+      photo: '',
       note: String(row['note'] || row['Note'] || row['NOTE'] || ''),
       nameAr: String(row['AR NAME'] || row['AR_NAME'] || row['ArName'] || row['name_ar'] || ''),
       partNum: String(row['Part.Num'] || row['PartNum'] || row['PART_NUM'] || row['part_num'] || ''),
@@ -269,13 +252,42 @@ function ImportModal({ language, t, store, products, onClose, onResult }: {
     if (!preview) return;
     setProcessing(true);
 
+    const valid = preview.filter(item => item.partNum);
+    const invalidCount = preview.length - valid.length;
+
+    if (valid.length > 50) {
+      const productsToUpdate = valid.filter(item => item.matched);
+      for (const item of productsToUpdate) {
+        const matchedProduct = products.find((p: any) => p.sku === item.partNum);
+        if (matchedProduct) {
+          store.updateProduct(matchedProduct.id, { stock: matchedProduct.stock + item.quantity });
+        }
+      }
+      store.bulkAddExternalPurchases(valid.map(item => ({
+        no: item.no, photo: '', note: item.note,
+        nameAr: item.nameAr, partNum: item.partNum, description: item.description,
+        brand: item.brand, unit: item.unit, quantity: item.quantity,
+        costPrice: item.costPrice, totalCostPrice: item.totalCostPrice,
+        itemNo: item.itemNo, weight: item.weight, totalWeight: item.totalWeight,
+        sellPrice: item.sellPrice, totalSellPrice: item.totalSellPrice,
+        productId: item.matched ? (products.find((p: any) => p.sku === item.partNum)?.id || null) : null,
+        importSessionId: null,
+      })));
+      store.addImportSession({
+        id: generateId(), filename: file?.name || '', uploadedAt: new Date().toISOString(),
+        totalRows: preview.length, importedCount: valid.length, updatedCount: 0,
+        skippedCount: invalidCount, errorCount: 0, errorReport: '',
+      });
+      setProcessing(false);
+      onResult({ imported: valid.length, skipped: invalidCount, warnings: [] });
+      return;
+    }
+
     let imported = 0;
     let skipped = 0;
     const warnings: string[] = [];
 
-    for (const item of preview) {
-      if (!item.partNum) { skipped++; continue; }
-
+    for (const item of valid) {
       const matchedProduct = item.matched ? products.find((p: any) => p.sku === item.partNum) : null;
 
       if (matchedProduct) {
@@ -286,25 +298,8 @@ function ImportModal({ language, t, store, products, onClose, onResult }: {
         continue;
       }
 
-      const photoUrl = item.photo || '';
-
-      const supabase = (await import('@/lib/supabase')).getSupabase();
-      let storedPhoto = '';
-      if (photoUrl && photoUrl.startsWith('blob:')) {
-        try {
-          const blobRes = await fetch(photoUrl);
-          const blob = await blobRes.blob();
-          const fileName = `external-purchases/${generateId()}_${item.partNum}.png`;
-          const { data: uploadData } = await supabase.storage.from('uploads').upload(fileName, blob);
-          if (uploadData) {
-            const { data: { publicUrl } } = supabase.storage.from('uploads').getPublicUrl(fileName);
-            storedPhoto = publicUrl;
-          }
-        } catch {}
-      }
-
       store.addExternalPurchase({
-        no: item.no, photo: storedPhoto, note: item.note,
+        no: item.no, photo: '', note: item.note,
         nameAr: item.nameAr, partNum: item.partNum, description: item.description,
         brand: item.brand, unit: item.unit, quantity: item.quantity,
         costPrice: item.costPrice, totalCostPrice: item.totalCostPrice,
@@ -319,11 +314,11 @@ function ImportModal({ language, t, store, products, onClose, onResult }: {
     store.addImportSession({
       id: generateId(), filename: file?.name || '', uploadedAt: new Date().toISOString(),
       totalRows: preview.length, importedCount: imported, updatedCount: 0,
-      skippedCount: skipped, errorCount: 0, errorReport: warnings.join('\n'),
+      skippedCount: skipped + invalidCount, errorCount: 0, errorReport: warnings.join('\n'),
     });
 
     setProcessing(false);
-    onResult({ imported, skipped, warnings });
+    onResult({ imported, skipped: skipped + invalidCount, warnings });
   };
 
   const handleDrop = useCallback((e: React.DragEvent) => {
