@@ -170,8 +170,19 @@ export default function ProductsPage() {
 
   const executeImport = () => {
     const selected = parsedRows.filter(r => r.selected);
-    let imported = 0;
-    const errors: string[] = [];
+    if (selected.length === 0) return;
+    if (selected.length > 50) {
+      store.bulkAddProducts(selected.map(row => ({
+        name: row.name, nameAr: '', sku: row.sku, barcode: '', description: '', descriptionAr: '',
+        categoryId: '', purchasePrice: 0, sellingPrice: row.price,
+        unitOfMeasure: 'piece', baseUnit: 'piece', conversionRate: 1,
+        trackInventory: true, stock: 0, lowStockThreshold: 0, reorderPoint: 0,
+        imageUrl: '', hasVariants: false, alternateSkus: [],
+      })));
+      setImportResult({ imported: selected.length, skipped: parsedRows.length - selected.length, errors: [] });
+      setImportStep('result');
+      return;
+    }
     for (const row of selected) {
       try {
         store.addProduct({
@@ -181,12 +192,13 @@ export default function ProductsPage() {
           trackInventory: true, stock: 0, lowStockThreshold: 0, reorderPoint: 0,
           imageUrl: '', hasVariants: false, alternateSkus: [],
         });
-        imported++;
       } catch (e: any) {
-        errors.push(`${row.sku}: ${e.message}`);
+        setImportResult({ imported: 0, skipped: 0, errors: [`${row.sku}: ${e.message}`] });
+        setImportStep('result');
+        return;
       }
     }
-    setImportResult({ imported, skipped: parsedRows.length - selected.length, errors });
+    setImportResult({ imported: selected.length, skipped: parsedRows.length - selected.length, errors: [] });
     setImportStep('result');
   };
 

@@ -68,6 +68,7 @@ interface AppStore {
   deleteSupplier: (id: string) => void;
 
   addProduct: (product: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>) => Product;
+  bulkAddProducts: (products: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>[]) => Product[];
   updateProduct: (id: string, data: Partial<Product>) => void;
   deleteProduct: (id: string) => void;
 
@@ -369,6 +370,18 @@ export const useAppStore = create<AppStore>()(
     get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'created', module: 'products', recordId: product.id, oldValues: null, newValues: data, ip: '192.168.1.100' });
     syncToSupabase('post', 'products', product);
     return product;
+  },
+  bulkAddProducts: (dataArr) => {
+    const products = dataArr.map(data => ({ ...data, id: generateId(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } as Product));
+    set((state) => ({ products: [...products, ...state.products] }));
+    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'created', module: 'products', recordId: `${products.length} bulk`, oldValues: null, newValues: { count: products.length }, ip: '192.168.1.100' });
+    if (isSupabaseConfigured) {
+      try {
+        const supabase = getSupabase();
+        supabase.from('products').insert(products).then(() => {}).catch(() => {});
+      } catch {}
+    }
+    return products;
   },
   updateProduct: (id, data) => {
     const old = get().products.find(p => p.id === id);
