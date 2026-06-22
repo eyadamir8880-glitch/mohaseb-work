@@ -196,6 +196,7 @@ export default function CustomerAccountPage() {
                     descriptionAr: entryDescAr,
                     debit: parseFloat(entryDebit) || 0,
                     credit: parseFloat(entryCredit) || 0,
+                    balance: 0,
                   });
                   setShowEntryForm(false);
                   setEntryRef('');
