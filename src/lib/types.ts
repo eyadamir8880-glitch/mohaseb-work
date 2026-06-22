@@ -461,6 +461,43 @@ export interface PaymentMethod {
   sortOrder: number;
 }
 
+export interface ExternalPurchase {
+  id: string;
+  no: number;
+  photo: string;
+  note: string;
+  nameAr: string;
+  partNum: string;
+  description: string;
+  brand: string;
+  unit: string;
+  quantity: number;
+  costPrice: number;
+  totalCostPrice: number;
+  itemNo: string;
+  weight: number;
+  totalWeight: number;
+  sellPrice: number;
+  totalSellPrice: number;
+  productId: string | null;
+  importSessionId: string | null;
+  createdAt: string;
+}
+
+export interface CustomerStatement {
+  id: string;
+  customerId: string;
+  date: string;
+  type: 'invoice' | 'payment' | 'return' | 'opening_balance';
+  referenceNumber: string;
+  description: string;
+  descriptionAr: string;
+  debit: number;
+  credit: number;
+  balance: number;
+  createdAt: string;
+}
+
 export interface PricingRule {
   id: string;
   productId: string;

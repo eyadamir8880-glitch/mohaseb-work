@@ -575,6 +575,50 @@ CREATE INDEX idx_deliveries_invoice ON deliveries(invoice_id);
 CREATE INDEX idx_deliveries_status ON deliveries(status);
 CREATE INDEX idx_deliveries_expected_date ON deliveries(expected_date);
 
+-- External Purchases
+CREATE TABLE external_purchases (
+  id                   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  no                   integer NOT NULL DEFAULT 0,
+  photo                text NOT NULL DEFAULT '',
+  note                 text NOT NULL DEFAULT '',
+  name_ar              text NOT NULL DEFAULT '',
+  part_num             text NOT NULL DEFAULT '',
+  description          text NOT NULL DEFAULT '',
+  brand                text NOT NULL DEFAULT '',
+  unit                 text NOT NULL DEFAULT '',
+  quantity             numeric NOT NULL DEFAULT 0,
+  cost_price           numeric NOT NULL DEFAULT 0,
+  total_cost_price     numeric NOT NULL DEFAULT 0,
+  item_no              text NOT NULL DEFAULT '',
+  weight               numeric NOT NULL DEFAULT 0,
+  total_weight         numeric NOT NULL DEFAULT 0,
+  sell_price           numeric NOT NULL DEFAULT 0,
+  total_sell_price     numeric NOT NULL DEFAULT 0,
+  product_id           uuid REFERENCES products(id) ON DELETE SET NULL,
+  import_session_id    uuid REFERENCES import_sessions(id) ON DELETE SET NULL,
+  created_at           timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_ep_part_num ON external_purchases(part_num);
+CREATE INDEX idx_ep_product ON external_purchases(product_id);
+CREATE INDEX idx_ep_created_at ON external_purchases(created_at);
+
+-- Customer Statements
+CREATE TABLE customer_statements (
+  id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  customer_id       uuid NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
+  date              date NOT NULL DEFAULT CURRENT_DATE,
+  type              text NOT NULL CHECK (type IN ('invoice', 'payment', 'return', 'opening_balance')),
+  reference_number  text NOT NULL DEFAULT '',
+  description       text NOT NULL DEFAULT '',
+  description_ar    text NOT NULL DEFAULT '',
+  debit             numeric NOT NULL DEFAULT 0,
+  credit            numeric NOT NULL DEFAULT 0,
+  balance           numeric NOT NULL DEFAULT 0,
+  created_at        timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_cs_customer ON customer_statements(customer_id);
+CREATE INDEX idx_cs_date ON customer_statements(date);
+
 -- Deferred circular foreign keys
 ALTER TABLE invoices ADD CONSTRAINT fk_invoices_treasury FOREIGN KEY (treasury_transaction_id) REFERENCES treasury_transactions(id);
 ALTER TABLE quotations ADD CONSTRAINT fk_quotations_converted FOREIGN KEY (converted_invoice_id) REFERENCES invoices(id);

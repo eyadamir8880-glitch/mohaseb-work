@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { generateMockData } from '@/lib/mock-data';
 import { PAYMENT_METHODS, DEFAULT_SETTINGS } from '@/lib/constants';
 import { generateId } from '@/lib/utils';
@@ -9,7 +10,8 @@ import type {
   Invoice, InvoicePayment, Quotation, PurchaseOrder, Return,
   TreasuryAccount, TreasuryTransaction, Warehouse, StockMovement,
   Employee, PayrollRecord, Asset, JournalEntry, ChartOfAccount,
-  Notification, AuditLog, Setting, ImportSession, DiscountRule, PaymentMethod
+  Notification, AuditLog, Setting, ImportSession, DiscountRule, PaymentMethod,
+  ExternalPurchase, CustomerStatement
 } from '@/lib/types';
 
 interface AppStore {
@@ -40,6 +42,8 @@ interface AppStore {
   importHistory: ImportSession[];
   discountRules: DiscountRule[];
   paymentMethods: PaymentMethod[];
+  externalPurchases: ExternalPurchase[];
+  customerStatements: CustomerStatement[];
 
   sidebarCollapsed: boolean;
   isInitialized: boolean;
@@ -141,6 +145,13 @@ interface AppStore {
 
   updatePaymentMethod: (id: string, data: Partial<PaymentMethod>) => void;
   addCustomPaymentMethod: (method: Omit<PaymentMethod, 'id' | 'isProtected'>) => PaymentMethod;
+
+  addExternalPurchase: (data: Omit<ExternalPurchase, 'id' | 'createdAt'>) => ExternalPurchase;
+  deleteExternalPurchase: (id: string) => void;
+  updateExternalPurchaseProductId: (id: string, productId: string | null) => void;
+
+  addCustomerStatement: (data: Omit<CustomerStatement, 'id' | 'createdAt'>) => CustomerStatement;
+  getCustomerStatements: (customerId: string) => CustomerStatement[];
 }
 
 async function syncToSupabase(method: 'post' | 'put' | 'delete', endpoint: string, data?: any) {
@@ -158,7 +169,9 @@ async function syncToSupabase(method: 'post' | 'put' | 'delete', endpoint: strin
   }
 }
 
-export const useAppStore = create<AppStore>((set, get) => ({
+export const useAppStore = create<AppStore>()(
+  persist(
+    (set, get) => ({
   language: 'en',
   theme: 'light',
   customers: [],
@@ -185,6 +198,8 @@ export const useAppStore = create<AppStore>((set, get) => ({
   importHistory: [],
   discountRules: [],
   paymentMethods: [...PAYMENT_METHODS],
+  externalPurchases: [],
+  customerStatements: [],
   sidebarCollapsed: false,
   isInitialized: false,
   lastSaveTime: null,
@@ -203,6 +218,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
           'stockMovements', 'employees', 'payrollRecords', 'assets',
           'journalEntries', 'chartOfAccounts', 'notifications', 'auditLogs',
           'settings', 'importHistory', 'discountRules', 'paymentMethods',
+          'externalPurchases', 'customerStatements',
         ] as const;
 
         const results = await Promise.all(
@@ -285,6 +301,7 @@ export const useAppStore = create<AppStore>((set, get) => ({
         'stockMovements', 'employees', 'payrollRecords', 'assets',
         'journalEntries', 'chartOfAccounts', 'notifications', 'auditLogs',
         'settings', 'importHistory', 'discountRules', 'paymentMethods',
+        'externalPurchases', 'customerStatements',
       ];
       for (const module of requiredModules) {
         if (!Array.isArray(state[module])) {
@@ -676,4 +693,46 @@ export const useAppStore = create<AppStore>((set, get) => ({
     syncToSupabase('post', 'paymentMethods', method);
     return method;
   },
-}));
+
+  addExternalPurchase: (data) => {
+    const purchase: ExternalPurchase = { ...data, id: generateId(), createdAt: new Date().toISOString() };
+    set((state) => ({ externalPurchases: [purchase, ...state.externalPurchases] }));
+    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'created', module: 'externalPurchases', recordId: purchase.id, oldValues: null, newValues: data, ip: '192.168.1.100' });
+    syncToSupabase('post', 'externalPurchases', purchase);
+    return purchase;
+  },
+  deleteExternalPurchase: (id) => {
+    const old = get().externalPurchases.find(p => p.id === id);
+    set((state) => ({ externalPurchases: state.externalPurchases.filter(p => p.id !== id) }));
+    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'deleted', module: 'externalPurchases', recordId: id, oldValues: old, newValues: null, ip: '192.168.1.100' });
+    syncToSupabase('delete', 'externalPurchases', { id });
+  },
+  updateExternalPurchaseProductId: (id, productId) => {
+    set((state) => ({ externalPurchases: state.externalPurchases.map(p => p.id === id ? { ...p, productId } : p) }));
+  },
+
+  addCustomerStatement: (data) => {
+    const statement: CustomerStatement = { ...data, id: generateId(), createdAt: new Date().toISOString() };
+    set((state) => ({ customerStatements: [statement, ...state.customerStatements] }));
+    syncToSupabase('post', 'customerStatements', statement);
+    return statement;
+  },
+  getCustomerStatements: (customerId) => {
+    return get().customerStatements.filter(s => s.customerId === customerId).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  },
+})),
+{
+  name: 'mohasebeyad-storage',
+  partialize: (state: any) => {
+    const { setLanguage, setTheme, toggleSidebar, initializeStore, resetToDemo,
+            getStateSnapshot, loadState, addAuditLog, ...data } = state;
+    return data;
+  },
+  merge: (persisted: any, current: any) => {
+    if (persisted?.customers?.length > 0 || persisted?.products?.length > 0) {
+      return { ...current, ...persisted, isInitialized: true };
+    }
+    return current;
+  },
+},
+);

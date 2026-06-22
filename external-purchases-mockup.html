@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>External Purchases Mockup</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f1f5f9; color: #1e293b; display: flex; }
+
+  /* Sidebar */
+  .sidebar { width: 260px; background: #fff; border-right: 1px solid #e2e8f0; height: 100vh; position: fixed; padding: 16px; }
+  .logo { display: flex; align-items: center; gap: 10px; padding-bottom: 16px; border-bottom: 1px solid #e2e8f0; margin-bottom: 16px; }
+  .logo-icon { width: 32px; height: 32px; background: #2563eb; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #fff; font-weight: bold; font-size: 14px; }
+  .logo-text { font-size: 18px; font-weight: 700; }
+  .nav { list-style: none; }
+  .nav li { padding: 10px 12px; border-radius: 8px; margin-bottom: 2px; font-size: 14px; display: flex; align-items: center; gap: 10px; cursor: pointer; color: #64748b; }
+  .nav li:hover { background: #f1f5f9; color: #1e293b; }
+  .nav li.active { background: #eff6ff; color: #2563eb; font-weight: 600; }
+  .nav-icon { width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; }
+  .nav-icon svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .nav-section { font-size: 11px; text-transform: uppercase; color: #94a3b8; font-weight: 600; padding: 16px 12px 8px; letter-spacing: 0.5px; }
+
+  /* Main */
+  .main { margin-left: 260px; flex: 1; padding: 24px 32px; }
+
+  /* Header */
+  .page-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+  .page-header h1 { font-size: 24px; font-weight: 700; }
+  .page-header .subtitle { font-size: 14px; color: #64748b; margin-top: 4px; }
+
+  /* Buttons */
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; border: none; }
+  .btn-primary { background: #2563eb; color: #fff; }
+  .btn-primary:hover { background: #1d4ed8; }
+  .btn-outline { background: transparent; color: #2563eb; border: 1px solid #2563eb; }
+  .btn-outline:hover { background: #eff6ff; }
+  .btn-sm { padding: 6px 12px; font-size: 13px; }
+
+  /* Stats */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+  .stat-card { background: #fff; border-radius: 12px; padding: 16px 20px; border: 1px solid #e2e8f0; }
+  .stat-card .label { font-size: 13px; color: #64748b; margin-bottom: 4px; }
+  .stat-card .value { font-size: 22px; font-weight: 700; color: #1e293b; }
+  .stat-card .change { font-size: 12px; color: #10b981; margin-top: 2px; }
+
+  /* Toolbar */
+  .toolbar { display: flex; gap: 12px; margin-bottom: 20px; align-items: center; flex-wrap: wrap; }
+  .search-box { flex: 1; max-width: 320px; position: relative; }
+  .search-box input { width: 100%; padding: 10px 14px 10px 36px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; outline: none; background: #fff; }
+  .search-box input:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.1); }
+  .search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #94a3b8; width: 16px; height: 16px; }
+  .filter-select { padding: 10px 14px; border: 1px solid #e2e8f0; border-radius: 8px; font-size: 14px; background: #fff; outline: none; }
+
+  /* Table */
+  .table-container { background: #fff; border-radius: 12px; border: 1px solid #e2e8f0; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; }
+  thead { background: #f8fafc; border-bottom: 2px solid #e2e8f0; }
+  th { padding: 12px 16px; text-align: left; font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
+  td { padding: 12px 16px; font-size: 14px; border-bottom: 1px solid #f1f5f9; white-space: nowrap; }
+  tr:hover td { background: #f8fafc; }
+  .text-right { text-align: right; }
+  .font-mono { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 13px; }
+  .badge { display: inline-flex; padding: 2px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+  .badge-success { background: #d1fae5; color: #065f46; }
+  .badge-warning { background: #fef3c7; color: #92400e; }
+
+  /* Import Modal */
+  .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 100; align-items: center; justify-content: center; }
+  .modal-overlay.show { display: flex; }
+  .modal { background: #fff; border-radius: 16px; width: 90%; max-width: 600px; padding: 0; box-shadow: 0 20px 60px rgba(0,0,0,0.15); }
+  .modal-header { padding: 20px 24px; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: space-between; align-items: center; }
+  .modal-header h2 { font-size: 18px; font-weight: 600; }
+  .modal-close { background: none; border: none; font-size: 24px; cursor: pointer; color: #94a3b8; padding: 4px; }
+  .modal-close:hover { color: #1e293b; }
+  .modal-body { padding: 24px; }
+  .modal-footer { padding: 16px 24px; border-top: 1px solid #e2e8f0; display: flex; justify-content: flex-end; gap: 12px; }
+
+  .drop-zone { border: 2px dashed #cbd5e1; border-radius: 12px; padding: 40px; text-align: center; cursor: pointer; transition: all 0.2s; }
+  .drop-zone:hover, .drop-zone.drag-over { border-color: #2563eb; background: #eff6ff; }
+  .drop-zone-icon { width: 48px; height: 48px; color: #94a3b8; margin-bottom: 12px; }
+  .drop-zone p { font-size: 14px; color: #64748b; }
+  .drop-zone .highlight { color: #2563eb; font-weight: 600; }
+
+  .import-preview { margin-top: 16px; }
+  .import-preview h3 { font-size: 14px; font-weight: 600; margin-bottom: 8px; }
+  .preview-table { font-size: 12px; }
+  .preview-table th { padding: 8px 10px; font-size: 11px; }
+  .preview-table td { padding: 8px 10px; font-size: 12px; }
+  .preview-table tr:last-child td { border-bottom: none; }
+
+  .column-map { margin-top: 16px; }
+  .column-map h3 { font-size: 14px; font-weight: 600; margin-bottom: 8px; }
+  .map-row { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
+  .map-row label { width: 120px; font-size: 13px; color: #64748b; }
+  .map-row select { flex: 1; padding: 6px 10px; border: 1px solid #e2e8f0; border-radius: 6px; font-size: 13px; }
+</style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<aside class="sidebar">
+  <div class="logo">
+    <div class="logo-icon">M</div>
+    <span class="logo-text">Mohasebeyad</span>
+  </div>
+  <ul class="nav">
+    <li><span class="nav-icon"><svg><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg></span> Dashboard</li>
+    <li><span class="nav-icon"><svg><path d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 100 4 2 2 0 000-4z"/></svg></span> POS</li>
+    <li><span class="nav-icon"><svg><path d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg></span> Invoices</li>
+    <li><span class="nav-icon"><svg><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></span> Quotations</li>
+    <li><span class="nav-icon"><svg><path d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"/></svg></span> Customers</li>
+    <li><span class="nav-icon"><svg><path d="M8 16H3a1 1 0 01-1-1V4a1 1 0 011-1h10a1 1 0 011 1v1m3 10h2a1 1 0 001-1v-4a1 1 0 00-.293-.707l-3-3A1 1 0 0014.586 6H13m-3 10a2 2 0 100 4 2 2 0 000-4zm8 0a2 2 0 100 4 2 2 0 000-4z"/></svg></span> Suppliers</li>
+    <li><span class="nav-icon"><svg><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg></span> Products</li>
+    <li><span class="nav-icon"><svg><path d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg></span> Variants</li>
+    <li><span class="nav-icon"><svg><path d="M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10zm3 3h3v3H7v-3zm7 0h3v3h-3v-3z"/></svg></span> Warehouse</li>
+    <li><span class="nav-icon"><svg><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg></span> POs</li>
+    <li class="active" style="background:#eff6ff;color:#2563eb;font-weight:600;">
+      <span class="nav-icon"><svg><path d="M12 21a9 9 0 100-18 9 9 0 000 18zm0 0V8m0 0l-3 3m3-3l3 3"/></svg></span> External Purchases
+      <span style="margin-left:auto;background:#2563eb;color:#fff;border-radius:12px;padding:1px 8px;font-size:11px">New</span>
+    </li>
+    <li><span class="nav-icon"><svg><path d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg></span> Returns</li>
+    <li><span class="nav-icon"><svg><path d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/></svg></span> Treasury</li>
+  </ul>
+</aside>
+
+<!-- Main -->
+<div class="main">
+
+  <!-- Page Header -->
+  <div class="page-header">
+    <div>
+      <h1>External Purchases <span style="font-size:14px;color:#94a3b8;font-weight:400;margin-left:8px;">مشتريات خارجية</span></h1>
+      <p class="subtitle">Import and track purchases from external suppliers</p>
+    </div>
+    <div style="display:flex;gap:10px">
+      <button class="btn btn-outline">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+        Export
+      </button>
+      <button class="btn btn-primary" onclick="document.getElementById('importModal').classList.add('show')">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3"/></svg>
+        Import Excel
+      </button>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats">
+    <div class="stat-card">
+      <div class="label">Total Imports</div>
+      <div class="value">24</div>
+      <div class="change">+3 this month</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Items Imported</div>
+      <div class="value">1,247</div>
+      <div class="change">+142 this month</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Total Cost (EGP)</div>
+      <div class="value">EGP 184,500</div>
+      <div class="change">+12.5%</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Stock Added</div>
+      <div class="value">3,820</div>
+      <div class="change" style="color:#2563eb;">units</div>
+    </div>
+  </div>
+
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <div class="search-box">
+      <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+      <input type="text" placeholder="Search by name, part number, brand...">
+    </div>
+    <select class="filter-select">
+      <option>All Imports</option>
+      <option>Today</option>
+      <option>This Week</option>
+      <option>This Month</option>
+    </select>
+    <select class="filter-select">
+      <option>All Brands</option>
+      <option>Toyota</option>
+      <option>Hyundai</option>
+      <option>Nissan</option>
+    </select>
+  </div>
+
+  <!-- Table -->
+  <div class="table-container">
+    <table>
+      <thead>
+        <tr>
+          <th>NO</th>
+          <th>PHOTO</th>
+          <th>note</th>
+          <th>AR NAME</th>
+          <th>Part.Num</th>
+          <th>DISCRIPTION</th>
+          <th>BRAND</th>
+          <th>Unit</th>
+          <th class="text-right">QTY</th>
+          <th class="text-right">C price</th>
+          <th class="text-right">Total CP</th>
+          <th>ITEM NO.</th>
+          <th class="text-right">weght</th>
+          <th class="text-right">T.W</th>
+          <th class="text-right">B PRICE</th>
+          <th class="text-right">TOTAL BP</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="font-mono">1</td>
+          <td><span style="color:#94a3b8;font-size:11px">📷</span></td>
+          <td style="font-size:12px;color:#64748b;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">New shipment</td>
+          <td>رادياتير تويوتا كورولا</td>
+          <td class="font-mono" style="color:#2563eb;font-weight:500">RAD-TOY-001</td>
+          <td style="font-size:12px;color:#64748b;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Toyota Corolla Radiator</td>
+          <td>Toyota</td>
+          <td>piece</td>
+          <td class="text-right font-mono">5</td>
+          <td class="text-right font-mono">850</td>
+          <td class="text-right font-mono">4,250</td>
+          <td class="font-mono" style="font-size:12px">RAD-001</td>
+          <td class="text-right font-mono">1.2</td>
+          <td class="text-right font-mono">6.0</td>
+          <td class="text-right font-mono">1,450</td>
+          <td class="text-right font-mono">7,250</td>
+        </tr>
+        <tr>
+          <td class="font-mono">2</td>
+          <td><span style="color:#94a3b8;font-size:11px">📷</span></td>
+          <td style="font-size:12px;color:#64748b">—</td>
+          <td>طقم فرامل أمامي تويوتا</td>
+          <td class="font-mono" style="color:#2563eb;font-weight:500">BRK-TOY-001</td>
+          <td style="font-size:12px;color:#64748b">Front Brake Pad Set</td>
+          <td>Toyota</td>
+          <td>piece</td>
+          <td class="text-right font-mono">10</td>
+          <td class="text-right font-mono">180</td>
+          <td class="text-right font-mono">1,800</td>
+          <td class="font-mono" style="font-size:12px">BRK-001</td>
+          <td class="text-right font-mono">0.5</td>
+          <td class="text-right font-mono">5.0</td>
+          <td class="text-right font-mono">320</td>
+          <td class="text-right font-mono">3,200</td>
+        </tr>
+        <tr>
+          <td class="font-mono">3</td>
+          <td><span style="color:#94a3b8;font-size:11px">📷</span></td>
+          <td style="font-size:12px;color:#64748b">Urgent</td>
+          <td>فلتر زيت تويوتا أصلي</td>
+          <td class="font-mono" style="color:#2563eb;font-weight:500">FLT-OIL-001</td>
+          <td style="font-size:12px;color:#64748b">Oil Filter</td>
+          <td>Toyota</td>
+          <td>piece</td>
+          <td class="text-right font-mono">20</td>
+          <td class="text-right font-mono">30</td>
+          <td class="text-right font-mono">600</td>
+          <td class="font-mono" style="font-size:12px">FLT-001</td>
+          <td class="text-right font-mono">0.1</td>
+          <td class="text-right font-mono">2.0</td>
+          <td class="text-right font-mono">60</td>
+          <td class="text-right font-mono">1,200</td>
+        </tr>
+        <tr>
+          <td class="font-mono">4</td>
+          <td><span style="color:#94a3b8;font-size:11px">📷</span></td>
+          <td style="font-size:12px;color:#64748b">—</td>
+          <td>رادياتير هيونداي النترا</td>
+          <td class="font-mono" style="color:#2563eb;font-weight:500">RAD-HYN-001</td>
+          <td style="font-size:12px;color:#64748b">Hyundai Elantra Radiator</td>
+          <td>Hyundai</td>
+          <td>piece</td>
+          <td class="text-right font-mono">3</td>
+          <td class="text-right font-mono">780</td>
+          <td class="text-right font-mono">2,340</td>
+          <td class="font-mono" style="font-size:12px">RAD-002</td>
+          <td class="text-right font-mono">1.1</td>
+          <td class="text-right font-mono">3.3</td>
+          <td class="text-right font-mono">1,320</td>
+          <td class="text-right font-mono">3,960</td>
+        </tr>
+        <tr>
+          <td class="font-mono">5</td>
+          <td><span style="color:#94a3b8;font-size:11px">📷</span></td>
+          <td style="font-size:12px;color:#64748b">Damaged box</td>
+          <td>طقم فرامل أمامي هيونداي</td>
+          <td class="font-mono" style="color:#2563eb;font-weight:500">BRK-HYN-001</td>
+          <td style="font-size:12px;color:#64748b">Front Brake Pad Set</td>
+          <td>Hyundai</td>
+          <td>piece</td>
+          <td class="text-right font-mono">8</td>
+          <td class="text-right font-mono">170</td>
+          <td class="text-right font-mono">1,360</td>
+          <td class="font-mono" style="font-size:12px">BRK-002</td>
+          <td class="text-right font-mono">0.4</td>
+          <td class="text-right font-mono">3.2</td>
+          <td class="text-right font-mono">300</td>
+          <td class="text-right font-mono">2,400</td>
+        </tr>
+      </tbody>
+    </table>
+    <div style="padding:16px;display:flex;justify-content:space-between;align-items:center;border-top:1px solid #f1f5f9">
+      <span style="font-size:13px;color:#64748b">Showing 5 of 24 imports</span>
+      <div style="display:flex;gap:4px">
+        <button class="btn btn-sm btn-outline" disabled>Prev</button>
+        <button class="btn btn-sm btn-primary">1</button>
+        <button class="btn btn-sm btn-outline">2</button>
+        <button class="btn btn-sm btn-outline">3</button>
+        <button class="btn btn-sm btn-outline">Next</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Import Modal -->
+<div class="modal-overlay" id="importModal">
+  <div class="modal">
+    <div class="modal-header">
+      <h2>Import Excel File</h2>
+      <button class="modal-close" onclick="document.getElementById('importModal').classList.remove('show')">&times;</button>
+    </div>
+    <div class="modal-body">
+      <!-- Step 1: Upload -->
+      <div class="drop-zone" id="dropZone">
+        <svg class="drop-zone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <path d="M12 16V4m0 0L8 8m4-4l4 4M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2"/>
+        </svg>
+        <p>Drag & drop your Excel file here, or <span class="highlight">browse</span></p>
+        <p style="font-size:12px;margin-top:4px">Supports .xlsx, .xls files</p>
+      </div>
+
+      <!-- Step 2: Column Mapping -->
+      <div class="column-map" style="margin-top:20px">
+        <h3>Column Mapping <span style="font-weight:400;color:#94a3b8;font-size:12px">(auto-detected)</span></h3>
+        <div class="map-row"><label>AR NAME →</label><select><option>name_ar (Arabic Name)</option></select></div>
+        <div class="map-row"><label>Part.Num →</label><select><option>sku (SKU / Part Number)</option></select></div>
+        <div class="map-row"><label>DISCRIPTION →</label><select><option>description (Description)</option></select></div>
+        <div class="map-row"><label>BRAND →</label><select><option>brand (Brand)</option></select></div>
+        <div class="map-row"><label>Unit →</label><select><option>unit (Unit of Measure)</option></select></div>
+        <div class="map-row"><label>QTY →</label><select><option>quantity (Quantity to add to stock)</option></select></div>
+        <div class="map-row"><label>C price →</label><select><option>cost_price (Unit Cost Price)</option></select></div>
+        <div class="map-row"><label>B PRICE →</label><select><option>sell_price (Unit Sell Price)</option></select></div>
+      </div>
+
+      <!-- Step 3: Preview -->
+      <div class="import-preview">
+        <h3>Preview <span style="font-weight:400;color:#94a3b8;font-size:12px">(first 3 rows)</span></h3>
+        <div class="table-container preview-table">
+          <table>
+            <thead>
+              <tr>
+                <th>Part.Num</th>
+                <th>AR NAME</th>
+                <th>QTY</th>
+                <th>C price</th>
+                <th>Total CP</th>
+                <th>B PRICE</th>
+                <th>Total BP</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td class="font-mono">RAD-TOY-001</td>
+                <td>رادياتير تويوتا كورولا</td>
+                <td>5</td>
+                <td class="font-mono">850</td>
+                <td class="font-mono">4,250</td>
+                <td class="font-mono">1,450</td>
+                <td class="font-mono">7,250</td>
+                <td><span class="badge badge-success">Match → +5 stock</span></td>
+              </tr>
+              <tr>
+                <td class="font-mono">BRK-TOY-001</td>
+                <td>طقم فرامل أمامي تويوتا</td>
+                <td>10</td>
+                <td class="font-mono">180</td>
+                <td class="font-mono">1,800</td>
+                <td class="font-mono">320</td>
+                <td class="font-mono">3,200</td>
+                <td><span class="badge badge-success">Match → +10 stock</span></td>
+              </tr>
+              <tr>
+                <td class="font-mono">NEW-PART-001</td>
+                <td>قطعة جديدة</td>
+                <td>2</td>
+                <td class="font-mono">500</td>
+                <td class="font-mono">1,000</td>
+                <td class="font-mono">900</td>
+                <td class="font-mono">1,800</td>
+                <td><span class="badge badge-warning">New → Create product</span></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="document.getElementById('importModal').classList.remove('show')">Cancel</button>
+      <button class="btn btn-primary">Import 5 Items</button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

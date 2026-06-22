@@ -81,6 +81,10 @@ const endpointToTable: Record<string, string> = {
   'payrollRecords': 'payroll_records',
   'deliveries': 'deliveries',
   'pricing-rules': 'pricing_rules',
+  'externalPurchases': 'external_purchases',
+  'external-purchases': 'external_purchases',
+  'customerStatements': 'customer_statements',
+  'customer-statements': 'customer_statements',
   'productCategories': 'categories',
   'treasuryCategories': 'categories',
 };
@@ -438,6 +442,12 @@ function handleGetRequest<T>(endpoint: string, params?: Record<string, any>): T 
     case 'payment-methods':
     case 'paymentMethods':
       return filterData(mockDb.paymentMethods, params) as any;
+    case 'externalPurchases':
+    case 'external-purchases':
+      return filterData(mockDb.externalPurchases, params) as any;
+    case 'customerStatements':
+    case 'customer-statements':
+      return filterData(mockDb.customerStatements, params) as any;
     case 'dashboard':
       return getDashboardData() as any;
     default:
@@ -465,6 +475,10 @@ function handlePostRequest<T>(endpoint: string, data: any): T {
     case 'quotations': mockDb.quotations.unshift(item); break;
     case 'purchase-orders':
     case 'purchaseOrders': mockDb.purchaseOrders.unshift({...item, items: data.items || []}); break;
+    case 'externalPurchases':
+    case 'external-purchases': mockDb.externalPurchases.unshift(item); break;
+    case 'customerStatements':
+    case 'customer-statements': mockDb.customerStatements.unshift(item); break;
     case 'returns': mockDb.returns.unshift(item); break;
     case 'treasury-accounts':
     case 'treasuryAccounts': mockDb.treasuryAccounts.unshift(item); break;
@@ -556,6 +570,8 @@ function handleDeleteRequest<T>(endpoint: string): T {
     case 'quotations': deleted = deleteFromCollection(mockDb.quotations); break;
     case 'purchase-orders':
     case 'purchaseOrders': deleted = deleteFromCollection(mockDb.purchaseOrders); break;
+    case 'externalPurchases':
+    case 'external-purchases': deleted = deleteFromCollection(mockDb.externalPurchases); break;
   }
 
   if (deleted) {
