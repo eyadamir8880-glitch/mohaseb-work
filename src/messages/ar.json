@@ -290,7 +290,8 @@
     "reconcile": "تسوية",
     "recurringTransactions": "معاملات متكررة",
     "cashFlowForecast": "توقعات التدفق النقدي",
-    "paymentMethodBreakdown": "تحليل طرق الدفع"
+    "paymentMethodBreakdown": "تحليل طرق الدفع",
+    "total": "إجمالي الرصيد"
   },
   "pos": {
     "title": "نقطة البيع",

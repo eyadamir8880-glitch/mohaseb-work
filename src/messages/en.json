@@ -290,7 +290,8 @@
     "reconcile": "Reconcile",
     "recurringTransactions": "Recurring Transactions",
     "cashFlowForecast": "Cash Flow Forecast",
-    "paymentMethodBreakdown": "Payment Method Breakdown"
+    "paymentMethodBreakdown": "Payment Method Breakdown",
+    "total": "Total Balance"
   },
   "pos": {
     "title": "Point of Sale",

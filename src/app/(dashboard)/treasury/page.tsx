@@ -48,6 +48,7 @@ export default function TreasuryPage() {
 
   const handleDeleteAll = () => {
     store.clearModuleData('treasuryTransactions');
+    store.treasuryAccounts.forEach(acc => store.updateTreasuryAccount(acc.id, { balance: 0 }));
     setShowDeleteAll(false);
   };
 
@@ -71,6 +72,10 @@ export default function TreasuryPage() {
 
       {/* Account Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="kpi-card bg-primary/10 border-primary/30">
+          <p className="kpi-label font-bold">{t('treasury.total')}</p>
+          <p className="kpi-value text-primary">{formatCurrency(treasuryAccounts.reduce((s, a) => s + a.balance, 0), 'EGP', language)}</p>
+        </div>
         {treasuryAccounts.map(acc => (
           <div key={acc.id} className="kpi-card">
             <p className="kpi-label">{language === 'ar' ? acc.nameAr : acc.name}</p>
