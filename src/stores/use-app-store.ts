@@ -206,7 +206,7 @@ export const useAppStore = create<AppStore>()(
 
   setLanguage: (lang: 'en' | 'ar') => set({ language: lang }),
   setTheme: (theme: 'light' | 'dark') => set({ theme }),
-  toggleSidebar: () => set((state) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
+  toggleSidebar: () => set((state: any) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
 
   initializeStore: async () => {
     if (isSupabaseConfigured) {
