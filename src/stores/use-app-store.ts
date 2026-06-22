@@ -170,7 +170,7 @@ async function syncToSupabase(method: 'post' | 'put' | 'delete', endpoint: strin
 }
 
 export const useAppStore = create<AppStore>()(
-  persist(
+  persist<AppStore>(
     (set, get) => ({
   language: 'en',
   theme: 'light',
