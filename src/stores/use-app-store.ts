@@ -720,8 +720,7 @@ export const useAppStore = create<AppStore>()(
   getCustomerStatements: (customerId) => {
     return get().customerStatements.filter(s => s.customerId === customerId).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   },
-})),
-{
+}), {
   name: 'mohasebeyad-storage',
   partialize: (state: any) => {
     const { setLanguage, setTheme, toggleSidebar, initializeStore, resetToDemo,
@@ -734,5 +733,5 @@ export const useAppStore = create<AppStore>()(
     }
     return current;
   },
-},
+}),
 );
