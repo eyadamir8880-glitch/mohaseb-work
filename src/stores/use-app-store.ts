@@ -7,7 +7,7 @@ import { apiClient, camelToSnake } from '@/lib/api-client';
 import { isSupabaseConfigured, getSupabase } from '@/lib/supabase';
 import type {
   Customer, Supplier, Product, ProductVariant, Category,
-  Invoice, InvoicePayment, Quotation, PurchaseOrder, Return,
+  Invoice, InvoicePayment, Quotation, PurchaseOrder, Return, ReturnItem,
   TreasuryAccount, TreasuryTransaction, Warehouse, StockMovement,
   Employee, PayrollRecord, Asset, JournalEntry, ChartOfAccount,
   Notification, AuditLog, Setting, ImportSession, DiscountRule, PaymentMethod,
@@ -161,9 +161,7 @@ function stripChildArrays(obj: any): any {
   if (Array.isArray(obj)) return obj;
   const result: any = {};
   for (const [key, value] of Object.entries(obj)) {
-    if (Array.isArray(value) && key !== 'items' && key !== 'payments') {
-      result[key] = value;
-    } else if (!Array.isArray(value)) {
+    if (!Array.isArray(value)) {
       result[key] = value;
     }
   }
@@ -521,16 +519,79 @@ export const useAppStore = create<AppStore>()(
     if (items) {
       items.forEach(item => syncToSupabase('post', 'invoice-items', { ...item, invoiceId: invoice.id }));
     }
+    if (invoice.customerId) {
+      get().addCustomerStatement({
+        customerId: invoice.customerId,
+        date: invoice.issueDate?.split('T')[0] || new Date().toISOString().split('T')[0],
+        type: 'invoice',
+        referenceNumber: invoice.invoiceNumber,
+        description: `Invoice ${invoice.invoiceNumber}`,
+        descriptionAr: `فاتورة ${invoice.invoiceNumber}`,
+        debit: invoice.grandTotal,
+        credit: 0,
+        balance: 0,
+      });
+    }
     return invoice;
   },
   updateInvoice: (id, data) => {
     const old = get().invoices.find(i => i.id === id);
+    const newStatus = data.status || old?.status || 'draft';
+    const wasNonDraft = old?.status !== 'draft' && old?.status !== undefined;
+    if (old && old.status === 'draft' && newStatus !== 'draft' && old.items) {
+      const state = get();
+      old.items.forEach(item => {
+        const product = state.products.find(p => p.id === item.productId);
+        if (product && product.trackInventory) {
+          get().updateProduct(product.id, { stock: Math.max(0, product.stock - item.quantity) });
+          get().addStockMovement({
+            productId: item.productId, variantId: item.variantId, type: 'out', quantity: item.quantity,
+            reason: `Invoice ${old.invoiceNumber} status changed to ${newStatus}`,
+            date: new Date().toISOString().split('T')[0],
+            referenceType: 'invoice', referenceId: id,
+            warehouseId: state.warehouses[0]?.id || '',
+          });
+        }
+      });
+    }
+    if (wasNonDraft && newStatus === 'cancelled' && old.items) {
+      const state = get();
+      old.items.forEach(item => {
+        const product = state.products.find(p => p.id === item.productId);
+        if (product && product.trackInventory) {
+          get().updateProduct(product.id, { stock: product.stock + item.quantity });
+          get().addStockMovement({
+            productId: item.productId, variantId: item.variantId, type: 'in', quantity: item.quantity,
+            reason: `Cancelled invoice ${old.invoiceNumber}`,
+            date: new Date().toISOString().split('T')[0],
+            referenceType: 'invoice', referenceId: id,
+            warehouseId: state.warehouses[0]?.id || '',
+          });
+        }
+      });
+    }
     set((state) => ({ invoices: state.invoices.map(i => i.id === id ? { ...i, ...data, updatedAt: new Date().toISOString() } : i) }));
     get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'updated', module: 'invoices', recordId: id, oldValues: old, newValues: data, ip: '' });
     syncToSupabase('put', 'invoices', { id, ...data });
   },
   deleteInvoice: (id) => {
     const old = get().invoices.find(i => i.id === id);
+    if (old && old.status !== 'draft' && old.items) {
+      const state = get();
+      old.items.forEach(item => {
+        const product = state.products.find(p => p.id === item.productId);
+        if (product && product.trackInventory) {
+          get().updateProduct(product.id, { stock: product.stock + item.quantity });
+          get().addStockMovement({
+            productId: item.productId, variantId: item.variantId, type: 'in', quantity: item.quantity,
+            reason: `Reversal of deleted invoice ${old.invoiceNumber}`,
+            date: new Date().toISOString().split('T')[0],
+            referenceType: 'invoice', referenceId: id,
+            warehouseId: state.warehouses[0]?.id || '',
+          });
+        }
+      });
+    }
     set((state) => ({ invoices: state.invoices.filter(i => i.id !== id) }));
     get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'deleted', module: 'invoices', recordId: id, oldValues: old, newValues: null, ip: '' });
     syncToSupabase('delete', 'invoices', { id });
@@ -543,19 +604,38 @@ export const useAppStore = create<AppStore>()(
     if (!invoice) return payment;
     const newPaidAmount = invoice.paidAmount + payment.amount;
     const newStatus = newPaidAmount >= invoice.grandTotal ? 'paid' : 'partially_paid';
+    const wasDraft = invoice.status === 'draft';
     set((state) => ({
       invoices: state.invoices.map(i =>
         i.id === invoiceId
-          ? { ...i, paidAmount: newPaidAmount, status: newStatus, payments: [...i.payments, payment], updatedAt: new Date().toISOString() }
+          ? { ...i, paidAmount: newPaidAmount, status: newStatus, payments: [...(i.payments || []), payment], updatedAt: new Date().toISOString() }
           : i
       ),
     }));
     get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'updated', module: 'invoices', recordId: invoiceId, oldValues: null, newValues: { paidAmount: newPaidAmount, status: newStatus }, ip: '' });
     syncToSupabase('post', 'invoicePayments', { ...data, invoiceId, id: payment.id, createdAt: payment.createdAt });
     syncToSupabase('put', 'invoices', { id: invoiceId, paidAmount: newPaidAmount, status: newStatus });
+
+    if (wasDraft && invoice.items) {
+      invoice.items.forEach(item => {
+        const product = state.products.find(p => p.id === item.productId);
+        if (product && product.trackInventory) {
+          get().updateProduct(product.id, { stock: Math.max(0, product.stock - item.quantity) });
+          get().addStockMovement({
+            productId: item.productId, variantId: item.variantId, type: 'out', quantity: item.quantity,
+            reason: `Payment for ${invoice.invoiceNumber}`,
+            date: new Date().toISOString().split('T')[0],
+            referenceType: 'invoice', referenceId: invoiceId,
+            warehouseId: state.warehouses[0]?.id || '',
+          });
+        }
+      });
+    }
+
+    const accountId = state.treasuryAccounts[0]?.id || '';
     get().addTreasuryTransaction({
       type: 'income', amount: payment.amount, date: data.paidAt?.split('T')[0] || new Date().toISOString().split('T')[0],
-      accountId: state.treasuryAccounts[0]?.id || '',
+      accountId,
       fromAccountId: null, toAccountId: null,
       paymentMethod: data.paymentMethod, paymentMethodDetail: data.paymentMethod,
       categoryId: '', description: `Payment for ${invoice.invoiceNumber}`,
@@ -565,6 +645,26 @@ export const useAppStore = create<AppStore>()(
       isRecurring: false, recurringPattern: null, nextOccurrence: null,
       isReconciled: false, reconciledAt: null,
     });
+    if (accountId) {
+      const account = state.treasuryAccounts.find(a => a.id === accountId);
+      if (account) {
+        get().updateTreasuryAccount(accountId, { balance: (account.balance || 0) + payment.amount });
+      }
+    }
+
+    if (invoice.customerId) {
+      get().addCustomerStatement({
+        customerId: invoice.customerId,
+        date: data.paidAt?.split('T')[0] || new Date().toISOString().split('T')[0],
+        type: 'payment',
+        referenceNumber: invoice.invoiceNumber,
+        description: `Payment received for ${invoice.invoiceNumber}`,
+        descriptionAr: `تم استلام دفعة للفاتورة ${invoice.invoiceNumber}`,
+        debit: 0,
+        credit: payment.amount,
+        balance: 0,
+      });
+    }
     return payment;
   },
 
@@ -621,6 +721,82 @@ export const useAppStore = create<AppStore>()(
     set((state) => ({ returns: [ret, ...state.returns] }));
     get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'created', module: 'returns', recordId: ret.id, oldValues: null, newValues: data, ip: '' });
     syncToSupabase('post', 'returns', ret);
+
+    // Stock reversal/update based on return items
+    if (ret.items && ret.items.length > 0) {
+      ret.items.forEach((item: ReturnItem) => {
+        const product = get().products.find(p => p.id === item.productId);
+        if (product) {
+          if (ret.type === 'customer') {
+            // Customer return: restore stock
+            get().updateProduct(product.id, { stock: (product.stock || 0) + item.quantity });
+          } else {
+            // Supplier return: reduce stock
+            get().updateProduct(product.id, { stock: Math.max(0, (product.stock || 0) - item.quantity) });
+          }
+        }
+        get().addStockMovement({
+          productId: item.productId, variantId: item.variantId, type: ret.type === 'customer' ? 'in' : 'out',
+          quantity: item.quantity, reason: `${ret.type === 'customer' ? 'Customer Return' : 'Supplier Return'} - ${ret.returnNumber}`,
+          date: new Date().toISOString().split('T')[0],
+          referenceType: 'return', referenceId: ret.id, warehouseId: '',
+        });
+      });
+    }
+
+    // Update invoice status for customer returns
+    if (ret.type === 'customer' && ret.originalInvoiceId) {
+      const invoice = get().invoices.find(inv => inv.id === ret.originalInvoiceId);
+      if (invoice) {
+        const allReturnedItems = ret.items?.length || 0;
+        const invoiceItems = invoice.items?.length || 0;
+        const isFullReturn = allReturnedItems >= invoiceItems && ret.items?.every((ri, idx) => {
+          const invItem = invoice.items?.[idx];
+          return invItem && ri.quantity >= invItem.quantity;
+        });
+        get().updateInvoice(ret.originalInvoiceId, { status: isFullReturn ? 'fully_returned' : 'partially_returned' });
+      }
+    }
+
+    // Customer statement for refund
+    if (ret.type === 'customer' && ret.originalInvoiceId && ret.refundAmount > 0) {
+      get().addCustomerStatement({
+        customerId: get().invoices.find(inv => inv.id === ret.originalInvoiceId)?.customerId || '',
+        date: new Date().toISOString().split('T')[0],
+        type: 'payment',
+        referenceNumber: ret.returnNumber,
+        description: `Refund - ${ret.returnNumber}`,
+        descriptionAr: `مرتجعات - ${ret.returnNumber}`,
+        debit: 0,
+        credit: ret.refundAmount,
+        balance: 0,
+      });
+    }
+
+    if (ret.refundAmount > 0) {
+      const state = get();
+      const accountId = state.treasuryAccounts[0]?.id || '';
+      get().addTreasuryTransaction({
+        type: 'expense', amount: ret.refundAmount, date: new Date().toISOString().split('T')[0],
+        accountId,
+        fromAccountId: null, toAccountId: null,
+        paymentMethod: ret.refundMethod, paymentMethodDetail: ret.refundMethod,
+        categoryId: '', description: `Refund for ${ret.returnNumber}`,
+        descriptionAr: `مرتجعات ${ret.returnNumber}`,
+        referenceNumber: '', receiptUrl: '',
+        linkedInvoiceId: ret.type === 'customer' ? ret.originalInvoiceId : null,
+        linkedPOId: ret.type === 'supplier' ? ret.originalPOId : null,
+        linkedReturnId: ret.id,
+        isRecurring: false, recurringPattern: null, nextOccurrence: null,
+        isReconciled: false, reconciledAt: null,
+      });
+      if (accountId) {
+        const account = state.treasuryAccounts.find(a => a.id === accountId);
+        if (account) {
+          get().updateTreasuryAccount(accountId, { balance: (account.balance || 0) - ret.refundAmount });
+        }
+      }
+    }
     return ret;
   },
   updateReturn: (id, data) => {
@@ -787,8 +963,14 @@ export const useAppStore = create<AppStore>()(
   },
 
   clearModuleData: (module) => {
+    const oldData = [...(get() as any)[module]];
     set({ [module]: [] } as any);
     get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'deleted', module, recordId: 'all', oldValues: null, newValues: null, ip: '' });
+    if (isSupabaseConfigured) {
+      try {
+        oldData.forEach((item: any) => syncToSupabase('delete', module, { id: item.id }));
+      } catch {}
+    }
   },
 
   addDiscountRule: (data) => {
@@ -841,6 +1023,7 @@ export const useAppStore = create<AppStore>()(
   },
   updateExternalPurchaseProductId: (id, productId) => {
     set((state) => ({ externalPurchases: state.externalPurchases.map(p => p.id === id ? { ...p, productId } : p) }));
+    syncToSupabase('put', 'externalPurchases', { id, productId });
   },
 
   addCustomerStatement: (data) => {

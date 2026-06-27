@@ -522,6 +522,7 @@ const ar = {
     noImports: 'لا توجد مشتريات مستوردة',
     dragDrop: 'اسحب وأفلت أو انقر للرفع',
     supportedFormats: '.xlsx, .xls, .csv :الصيغ المدعومة',
+    importExcel: 'استيراد إكسل',
     export: 'تصدير',
     preview: 'معاينة',
     deleteConfirm: 'حذف هذه المشتريات المستوردة؟',

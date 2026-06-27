@@ -63,6 +63,7 @@ ALTER TABLE public.products ADD COLUMN IF NOT EXISTS low_stock_threshold numeric
 ALTER TABLE public.products ADD COLUMN IF NOT EXISTS reorder_point numeric DEFAULT 0;
 ALTER TABLE public.products ADD COLUMN IF NOT EXISTS image_url text DEFAULT '';
 ALTER TABLE public.products ADD COLUMN IF NOT EXISTS has_variants boolean DEFAULT false;
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS alternate_skus jsonb DEFAULT '[]';
 
 -- quotations
 ALTER TABLE public.quotations ADD COLUMN IF NOT EXISTS customer_id uuid;

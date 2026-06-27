@@ -106,7 +106,7 @@ export default function InvoicesPage() {
       variantId: null,
       productName: i.productName,
       productNameAr: i.productNameAr,
-      sku: '',
+      sku: products.find(p => p.id === i.productId)?.sku || '',
       quantity: i.quantity,
       unitPrice: i.unitPrice,
       discountPercent: i.discountPercent,
@@ -438,7 +438,7 @@ export default function InvoicesPage() {
                 <span className="ml-2 font-medium">{formatCurrency(selectedInvoice.paidAmount, 'EGP', locale)}</span>
               </div>
             </div>
-            {selectedInvoice.payments.length === 0 ? (
+            {(selectedInvoice.payments || []).length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-8">{t('invoices.noPayments')}</p>
             ) : (
               <div className="overflow-x-auto">

@@ -88,6 +88,7 @@ export default function ProductsPage() {
         purchasePrice: form.purchasePrice, sellingPrice: form.sellingPrice,
         trackInventory: form.trackInventory,
         stock: form.stock, lowStockThreshold: form.lowStockThreshold,
+        unitOfMeasure: form.unitOfMeasure,
       });
     } else {
       store.addProduct({

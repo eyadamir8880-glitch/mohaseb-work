@@ -29,7 +29,9 @@ export default function POSPage() {
   const invoices = useAppStore((s) => s.invoices);
   const addInvoice = useAppStore((s) => s.addInvoice);
   const addTreasuryTransaction = useAppStore((s) => s.addTreasuryTransaction);
+  const updateTreasuryAccount = useAppStore((s) => s.updateTreasuryAccount);
   const updateProduct = useAppStore((s) => s.updateProduct);
+  const addStockMovement = useAppStore((s) => s.addStockMovement);
   const settings = useAppStore((s) => s.settings);
   const treasuryAccounts = useAppStore((s) => s.treasuryAccounts);
   const [search, setSearch] = useState('');
@@ -167,6 +169,7 @@ export default function POSPage() {
       invoiceNumber,
       customerId: '',
       items: invItems,
+      payments: [],
       subtotal,
       taxTotal: 0,
       discountTotal: discount,
@@ -188,6 +191,11 @@ export default function POSPage() {
       if (product && product.trackInventory) {
         updateProduct(product.id, { stock: product.stock - item.quantity });
       }
+      addStockMovement({
+        productId: item.productId, variantId: null, type: 'out', quantity: item.quantity,
+        reason: 'POS Sale', date: now.split('T')[0],
+        referenceType: 'invoice', referenceId: createdInvoice.id, warehouseId: '',
+      });
     });
 
     const accountId = getDefaultAccount();
@@ -215,6 +223,10 @@ export default function POSPage() {
         isReconciled: false,
         reconciledAt: null,
       });
+      const acc = treasuryAccounts.find((a) => a.id === accountId);
+      if (acc) {
+        updateTreasuryAccount(accountId, { balance: (acc.balance || 0) + grandTotal });
+      }
     }
 
     const change = Math.max(0, paidAmount - grandTotal);

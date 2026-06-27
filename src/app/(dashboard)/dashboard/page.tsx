@@ -19,6 +19,7 @@ export default function DashboardPage() {
   const transactions = useAppStore((s) => s.treasuryTransactions);
   const products = useAppStore((s) => s.products);
   const customers = useAppStore((s) => s.customers);
+  const treasuryAccounts = useAppStore((s) => s.treasuryAccounts);
 
   function getCustomerName(customerId: string): string {
     const c = customers.find(c => c.id === customerId);
@@ -29,7 +30,7 @@ export default function DashboardPage() {
     const totalRevenue = transactions.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0);
     const totalExpenses = transactions.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
     const outstandingAmt = invoices.filter((i) => i.status === 'sent' || i.status === 'overdue').reduce((s, i) => s + i.grandTotal, 0);
-    const currentBalance = (250000 + 1500000 + 15000) - totalExpenses + totalRevenue;
+    const currentBalance = treasuryAccounts.reduce((s, a) => s + (a.balance || 0), 0);
     return {
       totalRevenue, totalExpenses,
       netProfit: totalRevenue - totalExpenses,

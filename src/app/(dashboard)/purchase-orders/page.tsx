@@ -33,17 +33,19 @@ export default function PurchaseOrdersPage() {
     return result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [purchaseOrders, search, statusFilter, suppliers]);
 
-  const handleReceiveStock = (po: any) => {
-    // Update PO status
+  const handleReceiveStock = (poId: string, receivedQtys: Record<string, number>) => {
+    const po = purchaseOrders.find(p => p.id === poId);
+    if (!po) return;
     store.updatePurchaseOrder(po.id, { status: 'received', receivedDate: new Date().toISOString().split('T')[0] });
-    // Create stock movements for each item
     po.items.forEach((item: any) => {
+      const qty = receivedQtys[item.id] || 0;
+      if (qty <= 0) return;
       const product = store.products.find(p => p.id === item.productId);
       if (product) {
-        store.updateProduct(product.id, { stock: product.stock + item.receivedQuantity });
+        store.updateProduct(product.id, { stock: product.stock + qty });
       }
       store.addStockMovement({
-        productId: item.productId, variantId: item.variantId, type: 'in', quantity: item.receivedQuantity,
+        productId: item.productId, variantId: item.variantId, type: 'in', quantity: qty,
         reason: 'Purchase Order Received', date: new Date().toISOString().split('T')[0],
         referenceType: 'purchase_order', referenceId: po.id, warehouseId: store.warehouses[0]?.id || '',
       });
@@ -130,7 +132,7 @@ export default function PurchaseOrdersPage() {
       </Modal>
 
       <Modal isOpen={!!receiveModal} onClose={() => setReceiveModal(null)} title={t('purchaseOrders.receiveStock')}>
-        {receiveModal && <ReceiveStockForm poId={receiveModal} onSave={() => handleReceiveStock(purchaseOrders.find(p => p.id === receiveModal))} onCancel={() => setReceiveModal(null)} />}
+        {receiveModal && <ReceiveStockForm poId={receiveModal} onSave={(qtys) => handleReceiveStock(receiveModal, qtys)} onCancel={() => setReceiveModal(null)} />}
       </Modal>
 
       <Modal isOpen={!!payModal} onClose={() => setPayModal(null)} title={t('purchaseOrders.markPaid')}>
@@ -267,7 +269,7 @@ function POForm({ poId, onSave, onCancel }: { poId: string | null; onSave: () =>
   );
 }
 
-function ReceiveStockForm({ poId, onSave, onCancel }: { poId: string; onSave: () => void; onCancel: () => void }) {
+function ReceiveStockForm({ poId, onSave, onCancel }: { poId: string; onSave: (qtys: Record<string, number>) => void; onCancel: () => void }) {
   const { t, language } = useLanguage();
   const store = useAppStore();
   const po = store.purchaseOrders.find(p => p.id === poId);
@@ -293,7 +295,7 @@ function ReceiveStockForm({ poId, onSave, onCancel }: { poId: string; onSave: ()
       ))}
       <div className="flex justify-end gap-2">
         <Button variant="outline" onClick={onCancel}>{t('app.cancel')}</Button>
-        <Button onClick={onSave}>{t('purchaseOrders.receiveStock')}</Button>
+        <Button onClick={() => onSave(receivedQtys)}>{t('purchaseOrders.receiveStock')}</Button>
       </div>
     </div>
   );
@@ -311,14 +313,21 @@ function POPaymentForm({ poId, onSave, onCancel }: { poId: string; onSave: () =>
     if (!po) return;
     const paidAmount = parseFloat(amount);
     store.updatePurchaseOrder(po.id, { paidAmount, status: 'paid' });
+    const accId = store.treasuryAccounts[0]?.id || '';
     store.addTreasuryTransaction({
-      type: 'expense', amount: paidAmount, date: paymentDate, accountId: store.treasuryAccounts[0]?.id || '',
+      type: 'expense', amount: paidAmount, date: paymentDate, accountId: accId,
       fromAccountId: null, toAccountId: null, paymentMethod, paymentMethodDetail: paymentMethod,
       categoryId: '', description: `Payment for ${po.poNumber}`, descriptionAr: `دفعة لأمر الشراء ${po.poNumber}`,
       referenceNumber: '', receiptUrl: '', linkedInvoiceId: null, linkedPOId: po.id,
       linkedReturnId: null, isRecurring: false, recurringPattern: null, nextOccurrence: null,
       isReconciled: false, reconciledAt: null,
     });
+    if (accId) {
+      const acc = store.treasuryAccounts.find(a => a.id === accId);
+      if (acc) {
+        store.updateTreasuryAccount(accId, { balance: (acc.balance || 0) - paidAmount });
+      }
+    }
     onSave();
   };
 

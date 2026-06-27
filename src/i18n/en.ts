@@ -522,6 +522,7 @@ const en = {
     noImports: 'No imports yet',
     dragDrop: 'Drag & drop or click to upload',
     supportedFormats: 'Supported: .xlsx, .xls, .csv',
+    importExcel: 'Import Excel',
     export: 'Export',
     preview: 'Preview',
     deleteConfirm: 'Delete this import?',

@@ -81,6 +81,7 @@ export default function CustomerAccountPage() {
     });
 
     statements.forEach(s => {
+      if (s.type === 'invoice') return; // invoices processed via customerInvoices
       rows.push({
         date: s.date,
         reference: s.referenceNumber,
