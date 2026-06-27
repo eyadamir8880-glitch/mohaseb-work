@@ -206,7 +206,7 @@ export const apiClient = {
     if (isSupabaseConfigured) {
       try {
         const table = getTable(endpoint);
-        if (!table || table === 'categories' || endpoint.includes('dashboard')) {
+        if (!table || endpoint.includes('dashboard')) {
           return responseInterceptor({ data: data as any, status: 201, message: 'Created successfully' });
         }
         const { data: inserted, error } = await (getSupabase() as any)

@@ -268,7 +268,7 @@ export const useAppStore = create<AppStore>()(
             auditLogs: 'audit_logs', importHistory: 'import_sessions',
             discountRules: 'discount_rules', paymentMethods: 'payment_methods',
             payrollRecords: 'payroll_records', externalPurchases: 'external_purchases',
-            customerStatements: 'customer_statements',
+            customerStatements: 'customer_statements', variants: 'product_variants',
           };
           const supabase = getSupabase();
           for (const m of modules) {
@@ -464,7 +464,7 @@ export const useAppStore = create<AppStore>()(
     if (isSupabaseConfigured) {
       try {
         const supabase = getSupabase();
-        (supabase as any).from('products').insert(products).then(() => {}).catch(() => {});
+        (supabase as any).from('products').insert(products.map(p => camelToSnake(p))).then(() => {}).catch(() => {});
       } catch {}
     }
     return products;
@@ -829,7 +829,7 @@ export const useAppStore = create<AppStore>()(
     set((state) => ({ externalPurchases: [...purchases, ...state.externalPurchases] }));
     get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'created', module: 'externalPurchases', recordId: `${purchases.length} bulk`, oldValues: null, newValues: { count: purchases.length }, ip: '' });
     if (isSupabaseConfigured) {
-      try { (getSupabase() as any).from('external_purchases').insert(purchases).then(() => {}).catch(() => {}); } catch {}
+      try { (getSupabase() as any).from('external_purchases').insert(purchases.map(p => camelToSnake(p))).then(() => {}).catch(() => {}); } catch {}
     }
     return purchases;
   },

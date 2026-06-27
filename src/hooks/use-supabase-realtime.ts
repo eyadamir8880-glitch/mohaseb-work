@@ -95,21 +95,33 @@ export function useSupabaseRealtime() {
 
     channelRef.current = channel;
 
+    // Initialize poll state for all modules
+    for (const m of POLL_MODULES) {
+      lastPollRef.current[m] = { id: null, updatedAt: null };
+    }
+
     // Polling fallback: every 5 seconds check key modules for changes
     const startPolling = () => {
       pollIntervalRef.current = setInterval(async () => {
         for (const module of POLL_MODULES) {
           try {
-            const res = await apiClient.get<any[]>(module, { limit: 1 });
+            const res = await apiClient.get<any[]>(module, { limit: 1, sortBy: 'updatedAt', sortOrder: 'desc' });
+            const state = lastPollRef.current[module] as { id: string | null; updatedAt: string | null } | undefined;
             if (res.data && res.data.length > 0) {
-              const latestId = res.data[0].id;
-              if (lastPollRef.current[module] && lastPollRef.current[module] !== latestId) {
+              const record = res.data[0];
+              const changed = !state || state.id === null || state.id !== record.id || state.updatedAt !== record.updatedAt;
+              if (changed) {
                 const full = await apiClient.get<any[]>(module);
                 if (full.data) {
                   useAppStore.setState({ [module]: full.data });
                 }
               }
-              lastPollRef.current[module] = latestId;
+              lastPollRef.current[module] = { id: record.id, updatedAt: record.updatedAt };
+            } else {
+              if (state && state.id !== null) {
+                useAppStore.setState({ [module]: [] });
+              }
+              lastPollRef.current[module] = { id: null, updatedAt: null };
             }
           } catch {}
         }
