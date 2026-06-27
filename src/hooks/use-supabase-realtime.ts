@@ -56,7 +56,7 @@ export function useSupabaseRealtime() {
   const channelRef = useRef<RealtimeChannel | null>(null);
   const debounceRef = useRef<Record<string, number>>({});
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const lastPollRef = useRef<Record<string, string>>({});
+  const lastPollRef = useRef<Record<string, { id: string | null; updatedAt: string | null }>>({});
 
   useEffect(() => {
     if (!isSupabaseConfigured || !isInitialized) return;
@@ -106,7 +106,7 @@ export function useSupabaseRealtime() {
         for (const module of POLL_MODULES) {
           try {
             const res = await apiClient.get<any[]>(module, { limit: 1, sortBy: 'updatedAt', sortOrder: 'desc' });
-            const state = lastPollRef.current[module] as { id: string | null; updatedAt: string | null } | undefined;
+            const state = lastPollRef.current[module];
             if (res.data && res.data.length > 0) {
               const record = res.data[0];
               const changed = !state || state.id === null || state.id !== record.id || state.updatedAt !== record.updatedAt;
