@@ -1,5 +1,5 @@
 import { ApiResponse, ApiError, AuditLog, Notification } from './types';
-import { isSupabaseConfigured, supabaseClient } from './supabase';
+import { isSupabaseConfigured, getSupabase } from './supabase';
 
 const BASE_URL = '/api/';
 const API_VERSION = 'v1';
@@ -108,12 +108,12 @@ async function supabaseGet<T>(endpoint: string, params?: Record<string, any>): P
   if (!table) return [] as any;
 
   if (table === 'categories' && endpoint.includes('productCategories')) {
-    let query = (supabaseClient! as any).from('categories').select('*').eq('type', 'product');
+    let query = (getSupabase()).from('categories').select('*').eq('type', 'product');
     const all = await query;
     return snakeToCamel(all.data || []) as any;
   }
   if (table === 'categories' && endpoint.includes('treasuryCategories')) {
-    let query = (supabaseClient! as any).from('categories').select('*').in('type', ['income', 'expense']);
+    let query = (getSupabase()).from('categories').select('*').in('type', ['income', 'expense']);
     const all = await query;
     return snakeToCamel(all.data || []) as any;
   }
@@ -122,7 +122,7 @@ async function supabaseGet<T>(endpoint: string, params?: Record<string, any>): P
     return supabaseGetDashboard() as any;
   }
 
-  let query = (supabaseClient! as any).from(table).select('*');
+  let query = (getSupabase()).from(table).select('*');
 
   if (params) {
     if (params.search) {
@@ -185,7 +185,7 @@ function getModule(endpoint: string): string {
 
 export const apiClient = {
   get: async <T>(endpoint: string, params?: Record<string, any>): Promise<ApiResponse<T>> => {
-    if (isSupabaseConfigured && supabaseClient) {
+    if (isSupabaseConfigured) {
       try {
         const data = await supabaseGet<T>(endpoint, params);
         return responseInterceptor({ data, status: 200, message: 'Success' });
@@ -203,20 +203,20 @@ export const apiClient = {
   },
 
   post: async <T>(endpoint: string, data: any): Promise<ApiResponse<T>> => {
-    if (isSupabaseConfigured && supabaseClient) {
+    if (isSupabaseConfigured) {
       try {
         const table = getTable(endpoint);
         if (!table || table === 'categories' || endpoint.includes('dashboard')) {
           return responseInterceptor({ data: data as any, status: 201, message: 'Created successfully' });
         }
-        const { data: inserted, error } = await (supabaseClient! as any)
+        const { data: inserted, error } = await (getSupabase())
           .from(table)
           .insert(camelToSnake(data))
           .select()
           .single();
         if (error) throw { code: 'SUPABASE_ERROR', message: error.message };
 
-        await (supabaseClient! as any).from('audit_logs').insert({
+        await (getSupabase()).from('audit_logs').insert({
           timestamp: new Date().toISOString(),
           user: 'Admin',
           action: 'created',
@@ -242,7 +242,7 @@ export const apiClient = {
   },
 
   put: async <T>(endpoint: string, data: any): Promise<ApiResponse<T>> => {
-    if (isSupabaseConfigured && supabaseClient) {
+    if (isSupabaseConfigured) {
       try {
         const table = getTable(endpoint);
         const id = getId(endpoint) || data.id;
@@ -250,9 +250,9 @@ export const apiClient = {
           return responseInterceptor({ data: data as any, status: 200, message: 'Updated successfully' });
         }
 
-        const { data: oldData } = await (supabaseClient! as any).from(table).select('*').eq('id', id).single();
+        const { data: oldData } = await (getSupabase()).from(table).select('*').eq('id', id).single();
 
-        const { data: updated, error } = await (supabaseClient! as any)
+        const { data: updated, error } = await (getSupabase())
           .from(table)
           .update(camelToSnake(data))
           .eq('id', id)
@@ -260,7 +260,7 @@ export const apiClient = {
           .single();
         if (error) throw { code: 'SUPABASE_ERROR', message: error.message };
 
-        await (supabaseClient! as any).from('audit_logs').insert({
+        await (getSupabase()).from('audit_logs').insert({
           timestamp: new Date().toISOString(),
           user: 'Admin',
           action: 'updated',
@@ -286,7 +286,7 @@ export const apiClient = {
   },
 
   delete: async <T>(endpoint: string): Promise<ApiResponse<T>> => {
-    if (isSupabaseConfigured && supabaseClient) {
+    if (isSupabaseConfigured) {
       try {
         const table = getTable(endpoint);
         const id = getId(endpoint);
@@ -294,12 +294,12 @@ export const apiClient = {
           return responseInterceptor({ data: null as any, status: 200, message: 'Deleted successfully' });
         }
 
-        const { data: oldData } = await (supabaseClient! as any).from(table).select('*').eq('id', id).single();
+        const { data: oldData } = await (getSupabase()).from(table).select('*').eq('id', id).single();
 
-        const { error } = await (supabaseClient! as any).from(table).delete().eq('id', id);
+        const { error } = await (getSupabase()).from(table).delete().eq('id', id);
         if (error) throw { code: 'SUPABASE_ERROR', message: error.message };
 
-        await (supabaseClient! as any).from('audit_logs').insert({
+        await (getSupabase()).from('audit_logs').insert({
           timestamp: new Date().toISOString(),
           user: 'Admin',
           action: 'deleted',
@@ -325,10 +325,10 @@ export const apiClient = {
   },
 
   upload: async <T>(endpoint: string, formData: FormData): Promise<ApiResponse<T>> => {
-    if (isSupabaseConfigured && supabaseClient) {
+    if (isSupabaseConfigured) {
       const file = formData.get('file') as File;
       if (file) {
-        const { data, error } = await (supabaseClient! as any).storage
+        const { data, error } = await (getSupabase()).storage
           .from('uploads')
           .upload(`imports/${Date.now()}_${file.name}`, file);
         if (error) throw errorInterceptor({ code: 'UPLOAD_FAILED', message: error.message });
@@ -346,14 +346,14 @@ export const apiClient = {
 };
 
 async function supabaseGetDashboard(): Promise<any> {
-  if (!supabaseClient) return {};
+  try { getSupabase(); } catch { return {}; }
 
   const [invoicesRes, expensesRes, incomesRes, accountsRes, productsRes] = await Promise.all([
-    (supabaseClient as any).from('invoices').select('grand_total, paid_amount, status'),
-    (supabaseClient as any).from('treasury_transactions').select('amount, type').eq('type', 'expense'),
-    (supabaseClient as any).from('treasury_transactions').select('amount, type').eq('type', 'income'),
-    (supabaseClient as any).from('treasury_accounts').select('balance'),
-    (supabaseClient as any).from('products').select('stock, low_stock_threshold, track_inventory').eq('track_inventory', true),
+    (getSupabase()).from('invoices').select('grand_total, paid_amount, status'),
+    (getSupabase()).from('treasury_transactions').select('amount, type').eq('type', 'expense'),
+    (getSupabase()).from('treasury_transactions').select('amount, type').eq('type', 'income'),
+    (getSupabase()).from('treasury_accounts').select('balance'),
+    (getSupabase()).from('products').select('stock, low_stock_threshold, track_inventory').eq('track_inventory', true),
   ]);
 
   const totalRevenue = (incomesRes.data || []).reduce((s: number, t: any) => s + t.amount, 0);
@@ -365,7 +365,7 @@ async function supabaseGetDashboard(): Promise<any> {
     .reduce((s: number, i: any) => s + (i.grand_total - (i.paid_amount || 0)), 0);
   const lowStockCount = (productsRes.data || []).filter((p: any) => p.stock <= p.low_stock_threshold).length;
 
-  const recentLogs = await (supabaseClient as any).from('audit_logs').select('*').order('created_at', { ascending: false }).limit(20);
+  const recentLogs = await (getSupabase()).from('audit_logs').select('*').order('created_at', { ascending: false }).limit(20);
 
   return {
     totalRevenue,
