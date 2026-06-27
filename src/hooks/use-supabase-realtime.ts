@@ -56,7 +56,8 @@ export function useSupabaseRealtime() {
   const channelRef = useRef<RealtimeChannel | null>(null);
   const debounceRef = useRef<Record<string, number>>({});
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const lastPollRef = useRef<Record<string, { id: string | null; updatedAt: string | null }>>({});
+  const lastPollRef = useRef<Record<string, { id: string | null; createdAt: string | null }>>({});
+  const pollCountRef = useRef(0);
 
   useEffect(() => {
     if (!isSupabaseConfigured || !isInitialized) return;
@@ -97,31 +98,48 @@ export function useSupabaseRealtime() {
 
     // Initialize poll state for all modules
     for (const m of POLL_MODULES) {
-      lastPollRef.current[m] = { id: null, updatedAt: null };
+      lastPollRef.current[m] = { id: null, createdAt: null };
     }
 
-    // Polling fallback: every 5 seconds check key modules for changes
+    // Polling fallback: every 5 seconds check for changes
+    // Lightweight check (limit:1, default sort by created_at DESC) every cycle
+    // Full refetch every 60 seconds to catch updates and mid-list deletions
     const startPolling = () => {
       pollIntervalRef.current = setInterval(async () => {
+        pollCountRef.current++;
+        const isFullCycle = pollCountRef.current % 12 === 0;
+
+        if (isFullCycle) {
+          for (const module of POLL_MODULES) {
+            try {
+              const res = await apiClient.get<any[]>(module);
+              if (res.data) {
+                useAppStore.setState({ [module]: res.data });
+              }
+            } catch {}
+          }
+          return;
+        }
+
         for (const module of POLL_MODULES) {
           try {
-            const res = await apiClient.get<any[]>(module, { limit: 1, sortBy: 'updatedAt', sortOrder: 'desc' });
+            const res = await apiClient.get<any[]>(module, { limit: 1 });
             const state = lastPollRef.current[module];
             if (res.data && res.data.length > 0) {
               const record = res.data[0];
-              const changed = !state || state.id === null || state.id !== record.id || state.updatedAt !== record.updatedAt;
+              const changed = !state || state.id === null || state.id !== record.id || state.createdAt !== record.createdAt;
               if (changed) {
                 const full = await apiClient.get<any[]>(module);
                 if (full.data) {
                   useAppStore.setState({ [module]: full.data });
                 }
               }
-              lastPollRef.current[module] = { id: record.id, updatedAt: record.updatedAt };
+              lastPollRef.current[module] = { id: record.id, createdAt: record.createdAt };
             } else {
               if (state && state.id !== null) {
                 useAppStore.setState({ [module]: [] });
               }
-              lastPollRef.current[module] = { id: null, updatedAt: null };
+              lastPollRef.current[module] = { id: null, createdAt: null };
             }
           } catch {}
         }
