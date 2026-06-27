@@ -108,12 +108,12 @@ async function supabaseGet<T>(endpoint: string, params?: Record<string, any>): P
   if (!table) return [] as any;
 
   if (table === 'categories' && endpoint.includes('productCategories')) {
-    let query = (getSupabase()).from('categories').select('*').eq('type', 'product');
+    let query = (getSupabase() as any).from('categories').select('*').eq('type', 'product');
     const all = await query;
     return snakeToCamel(all.data || []) as any;
   }
   if (table === 'categories' && endpoint.includes('treasuryCategories')) {
-    let query = (getSupabase()).from('categories').select('*').in('type', ['income', 'expense']);
+    let query = (getSupabase() as any).from('categories').select('*').in('type', ['income', 'expense']);
     const all = await query;
     return snakeToCamel(all.data || []) as any;
   }
@@ -122,7 +122,7 @@ async function supabaseGet<T>(endpoint: string, params?: Record<string, any>): P
     return supabaseGetDashboard() as any;
   }
 
-  let query = (getSupabase()).from(table).select('*');
+  let query = (getSupabase() as any).from(table).select('*');
 
   if (params) {
     if (params.search) {
@@ -209,14 +209,14 @@ export const apiClient = {
         if (!table || table === 'categories' || endpoint.includes('dashboard')) {
           return responseInterceptor({ data: data as any, status: 201, message: 'Created successfully' });
         }
-        const { data: inserted, error } = await (getSupabase())
+        const { data: inserted, error } = await (getSupabase() as any)
           .from(table)
           .insert(camelToSnake(data))
           .select()
           .single();
         if (error) throw { code: 'SUPABASE_ERROR', message: error.message };
 
-        await (getSupabase()).from('audit_logs').insert({
+        await (getSupabase() as any).from('audit_logs').insert({
           timestamp: new Date().toISOString(),
           user: 'Admin',
           action: 'created',
@@ -250,9 +250,9 @@ export const apiClient = {
           return responseInterceptor({ data: data as any, status: 200, message: 'Updated successfully' });
         }
 
-        const { data: oldData } = await (getSupabase()).from(table).select('*').eq('id', id).single();
+        const { data: oldData } = await (getSupabase() as any).from(table).select('*').eq('id', id).single();
 
-        const { data: updated, error } = await (getSupabase())
+        const { data: updated, error } = await (getSupabase() as any)
           .from(table)
           .update(camelToSnake(data))
           .eq('id', id)
@@ -260,7 +260,7 @@ export const apiClient = {
           .single();
         if (error) throw { code: 'SUPABASE_ERROR', message: error.message };
 
-        await (getSupabase()).from('audit_logs').insert({
+        await (getSupabase() as any).from('audit_logs').insert({
           timestamp: new Date().toISOString(),
           user: 'Admin',
           action: 'updated',
@@ -294,12 +294,12 @@ export const apiClient = {
           return responseInterceptor({ data: null as any, status: 200, message: 'Deleted successfully' });
         }
 
-        const { data: oldData } = await (getSupabase()).from(table).select('*').eq('id', id).single();
+        const { data: oldData } = await (getSupabase() as any).from(table).select('*').eq('id', id).single();
 
-        const { error } = await (getSupabase()).from(table).delete().eq('id', id);
+        const { error } = await (getSupabase() as any).from(table).delete().eq('id', id);
         if (error) throw { code: 'SUPABASE_ERROR', message: error.message };
 
-        await (getSupabase()).from('audit_logs').insert({
+        await (getSupabase() as any).from('audit_logs').insert({
           timestamp: new Date().toISOString(),
           user: 'Admin',
           action: 'deleted',
@@ -328,7 +328,7 @@ export const apiClient = {
     if (isSupabaseConfigured) {
       const file = formData.get('file') as File;
       if (file) {
-        const { data, error } = await (getSupabase()).storage
+        const { data, error } = await (getSupabase() as any).storage
           .from('uploads')
           .upload(`imports/${Date.now()}_${file.name}`, file);
         if (error) throw errorInterceptor({ code: 'UPLOAD_FAILED', message: error.message });
@@ -349,11 +349,11 @@ async function supabaseGetDashboard(): Promise<any> {
   try { getSupabase(); } catch { return {}; }
 
   const [invoicesRes, expensesRes, incomesRes, accountsRes, productsRes] = await Promise.all([
-    (getSupabase()).from('invoices').select('grand_total, paid_amount, status'),
-    (getSupabase()).from('treasury_transactions').select('amount, type').eq('type', 'expense'),
-    (getSupabase()).from('treasury_transactions').select('amount, type').eq('type', 'income'),
-    (getSupabase()).from('treasury_accounts').select('balance'),
-    (getSupabase()).from('products').select('stock, low_stock_threshold, track_inventory').eq('track_inventory', true),
+    (getSupabase() as any).from('invoices').select('grand_total, paid_amount, status'),
+    (getSupabase() as any).from('treasury_transactions').select('amount, type').eq('type', 'expense'),
+    (getSupabase() as any).from('treasury_transactions').select('amount, type').eq('type', 'income'),
+    (getSupabase() as any).from('treasury_accounts').select('balance'),
+    (getSupabase() as any).from('products').select('stock, low_stock_threshold, track_inventory').eq('track_inventory', true),
   ]);
 
   const totalRevenue = (incomesRes.data || []).reduce((s: number, t: any) => s + t.amount, 0);
@@ -365,7 +365,7 @@ async function supabaseGetDashboard(): Promise<any> {
     .reduce((s: number, i: any) => s + (i.grand_total - (i.paid_amount || 0)), 0);
   const lowStockCount = (productsRes.data || []).filter((p: any) => p.stock <= p.low_stock_threshold).length;
 
-  const recentLogs = await (getSupabase()).from('audit_logs').select('*').order('created_at', { ascending: false }).limit(20);
+  const recentLogs = await (getSupabase() as any).from('audit_logs').select('*').order('created_at', { ascending: false }).limit(20);
 
   return {
     totalRevenue,
