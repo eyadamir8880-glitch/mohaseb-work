@@ -1,5 +1,5 @@
 import { ApiResponse, ApiError, AuditLog, Notification } from './types';
-import supabaseClient, { isSupabaseConfigured } from './supabase';
+import { isSupabaseConfigured, supabaseClient } from './supabase';
 
 const BASE_URL = '/api/';
 const API_VERSION = 'v1';

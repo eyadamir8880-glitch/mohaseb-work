@@ -20,4 +20,5 @@ export function getSupabase() {
   return supabaseClient;
 }
 
+export { supabaseClient };
 export default supabaseClient;
