@@ -163,15 +163,40 @@ function POForm({ poId, onSave, onCancel }: { poId: string | null; onSave: () =>
   const [expectedDate, setExpectedDate] = useState(existing?.expectedDate || '');
   const [status, setStatus] = useState(existing?.status || 'draft');
   const [notes, setNotes] = useState(existing?.notes || '');
+  const [items, setItems] = useState(existing?.items || [{ id: '', productId: '', productName: '', productNameAr: '', sku: '', orderedQuantity: 1, receivedQuantity: 0, unitPrice: 0, lineTotal: 0 }]);
+
+  const handleItemChange = (index: number, field: string, value: string | number) => {
+    setItems(prev => {
+      const updated = [...prev];
+      const item = { ...updated[index], [field]: value };
+      if (field === 'productId') {
+        const product = store.products.find(p => p.id === value);
+        if (product) {
+          item.productName = product.name;
+          item.productNameAr = product.nameAr || '';
+          item.unitPrice = product.purchasePrice || product.sellingPrice;
+        }
+      }
+      const qty = (field === 'orderedQuantity' ? Number(value) : item.orderedQuantity) || 0;
+      const price = (field === 'unitPrice' ? Number(value) : item.unitPrice) || 0;
+      item.lineTotal = qty * price;
+      updated[index] = item;
+      return updated;
+    });
+  };
+
+  const addItem = () => setItems(prev => [...prev, { id: '', productId: '', productName: '', productNameAr: '', sku: '', orderedQuantity: 1, receivedQuantity: 0, unitPrice: 0, lineTotal: 0 }]);
+  const removeItem = (index: number) => setItems(prev => prev.filter((_, i) => i !== index));
 
   const handleSave = () => {
-    const items = [{ id: '1', productId: '', variantId: null, productName: 'Sample', productNameAr: 'عينة', sku: 'SMP', orderedQuantity: 10, receivedQuantity: 0, unitPrice: 50, lineTotal: 500 }];
+    const poItems = items.map(i => ({ ...i, id: i.id || crypto.randomUUID(), variantId: null }));
+    const subtotal = items.reduce((s, i) => s + (i.orderedQuantity || 0) * (i.unitPrice || 0), 0);
     if (existing) {
-      store.updatePurchaseOrder(existing.id, { supplierId, orderDate, expectedDate, status: status as any, notes, items, subtotal: 500, taxTotal: 0, grandTotal: 500 });
+      store.updatePurchaseOrder(existing.id, { supplierId, orderDate, expectedDate, status: status as any, notes, items: poItems, subtotal, taxTotal: 0, grandTotal: subtotal });
     } else {
       store.addPurchaseOrder({
         poNumber: `PO-${String(store.purchaseOrders.length + 1).padStart(3, '0')}`,
-        supplierId, items, subtotal: 500, taxTotal: 0, grandTotal: 500, paidAmount: 0,
+        supplierId, items: poItems, subtotal, taxTotal: 0, grandTotal: subtotal, paidAmount: 0,
         status: status as any, orderDate, expectedDate, receivedDate: null, notes, treasuryTransactionId: null,
       });
     }
@@ -191,13 +216,52 @@ function POForm({ poId, onSave, onCancel }: { poId: string | null; onSave: () =>
             { value: 'sent', label: t('purchaseOrders.status.sent') },
           ]} />
       </div>
+
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <label className="text-sm font-medium">{t('invoices.items')}</label>
+          <Button variant="outline" size="sm" onClick={addItem}>
+            <svg className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            {t('invoices.addItem')}
+          </Button>
+        </div>
+        {items.map((item, i) => (
+          <div key={i} className="flex gap-2 items-end">
+            <Select value={item.productId}
+              onChange={(e) => handleItemChange(i, 'productId', e.target.value)}
+              options={store.products.map(p => ({ value: p.id, label: language === 'ar' ? p.nameAr || p.name : p.name }))}
+              placeholder={t('app.select')} className="flex-[2]" />
+            <Input type="number" min="1" value={item.orderedQuantity}
+              onChange={(e) => handleItemChange(i, 'orderedQuantity', e.target.value)}
+              className="w-20" label={t('purchaseOrders.orderedQuantity')} />
+            <Input type="number" min="0" step="0.01" value={item.unitPrice}
+              onChange={(e) => handleItemChange(i, 'unitPrice', e.target.value)}
+              className="w-24" label={t('invoices.unitPrice')} />
+            <div className="text-sm font-medium w-24 text-right pt-5">
+              {formatCurrency((item.orderedQuantity || 0) * (item.unitPrice || 0), 'EGP', language)}
+            </div>
+            <button className="btn-ghost btn-sm p-1 mb-1 text-red-600" onClick={() => removeItem(i)}>
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex justify-between text-sm border-t pt-3">
+        <span className="font-medium">{t('invoices.grandTotal')}: {formatCurrency(items.reduce((s, i) => s + (i.orderedQuantity || 0) * (i.unitPrice || 0), 0), 'EGP', language)}</span>
+      </div>
+
       <div>
         <label className="label">{t('invoices.notes')}</label>
         <textarea className="input mt-1 min-h-[60px]" value={notes} onChange={(e) => setNotes(e.target.value)} />
       </div>
       <div className="flex justify-end gap-2">
         <Button variant="outline" onClick={onCancel}>{t('app.cancel')}</Button>
-        <Button onClick={handleSave}>{t('app.save')}</Button>
+        <Button onClick={handleSave} disabled={!supplierId || items.length === 0 || items.some(i => !i.productId)}>{t('app.save')}</Button>
       </div>
     </div>
   );

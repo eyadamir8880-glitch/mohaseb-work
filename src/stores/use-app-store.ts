@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 import { generateMockData } from '@/lib/mock-data';
 import { PAYMENT_METHODS, DEFAULT_SETTINGS } from '@/lib/constants';
 import { generateId } from '@/lib/utils';
-import { apiClient } from '@/lib/api-client';
+import { apiClient, camelToSnake } from '@/lib/api-client';
 import { isSupabaseConfigured, getSupabase } from '@/lib/supabase';
 import type {
   Customer, Supplier, Product, ProductVariant, Category,
@@ -156,15 +156,30 @@ interface AppStore {
   getCustomerStatements: (customerId: string) => CustomerStatement[];
 }
 
+function stripChildArrays(obj: any): any {
+  if (!obj || typeof obj !== 'object') return obj;
+  if (Array.isArray(obj)) return obj;
+  const result: any = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (Array.isArray(value) && key !== 'items' && key !== 'payments') {
+      result[key] = value;
+    } else if (!Array.isArray(value)) {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
 async function syncToSupabase(method: 'post' | 'put' | 'delete', endpoint: string, data?: any) {
   if (!isSupabaseConfigured) return;
   try {
+    const cleanData = stripChildArrays(data);
     if (method === 'delete') {
       await apiClient.delete(`${endpoint}/${data.id}`);
     } else if (method === 'put') {
-      await apiClient.put(`${endpoint}/${data.id}`, data);
+      await apiClient.put(`${endpoint}/${data.id}`, cleanData);
     } else {
-      await apiClient.post(endpoint, data);
+      await apiClient.post(endpoint, cleanData);
     }
   } catch (err) {
     console.error(`Supabase sync failed (${method} ${endpoint}):`, err);
@@ -211,24 +226,67 @@ export const useAppStore = create<AppStore>()(
   toggleSidebar: () => set((state: any) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
 
   initializeStore: async () => {
+    const modules = [
+      'customers', 'suppliers', 'products', 'variants', 'categories',
+      'invoices', 'quotations', 'purchaseOrders', 'returns',
+      'treasuryAccounts', 'treasuryTransactions', 'warehouses',
+      'stockMovements', 'employees', 'payrollRecords', 'assets',
+      'journalEntries', 'chartOfAccounts', 'notifications', 'auditLogs',
+      'settings', 'importHistory', 'discountRules', 'paymentMethods',
+      'externalPurchases', 'customerStatements',
+    ] as const;
+
+    const localState: Record<string, any[]> = {};
+    modules.forEach((m) => { localState[m] = (get() as any)[m] || []; });
+    const hasLocalData = modules.some(m => localState[m]?.length > 0);
+
     if (isSupabaseConfigured) {
       try {
-        const modules = [
-          'customers', 'suppliers', 'products', 'variants', 'categories',
-          'invoices', 'quotations', 'purchaseOrders', 'returns',
-          'treasuryAccounts', 'treasuryTransactions', 'warehouses',
-          'stockMovements', 'employees', 'payrollRecords', 'assets',
-          'journalEntries', 'chartOfAccounts', 'notifications', 'auditLogs',
-          'settings', 'importHistory', 'discountRules', 'paymentMethods',
-          'externalPurchases', 'customerStatements',
-        ] as const;
-
         const results = await Promise.all(
           modules.map((m) => apiClient.get<any[]>(m).catch(() => ({ data: [] })))
         );
 
         const stateData: Record<string, any[]> = {};
-        modules.forEach((m, i) => { stateData[m] = results[i].data || []; });
+        let supabaseHasData = false;
+
+        modules.forEach((m, i) => {
+          const localData = localState[m] || [];
+          const supabaseData = results[i].data || [];
+          if (localData.length > 0) {
+            stateData[m] = localData;
+          } else {
+            stateData[m] = supabaseData;
+            if (supabaseData.length > 0) supabaseHasData = true;
+          }
+        });
+
+        if (hasLocalData && !supabaseHasData) {
+          const tableMap: Record<string, string> = {
+            purchaseOrders: 'purchase_orders', treasuryAccounts: 'treasury_accounts',
+            treasuryTransactions: 'treasury_transactions', stockMovements: 'stock_movements',
+            journalEntries: 'journal_entries', chartOfAccounts: 'chart_of_accounts',
+            auditLogs: 'audit_logs', importHistory: 'import_sessions',
+            discountRules: 'discount_rules', paymentMethods: 'payment_methods',
+            payrollRecords: 'payroll_records', externalPurchases: 'external_purchases',
+            customerStatements: 'customer_statements',
+          };
+          const supabase = getSupabase();
+          for (const m of modules) {
+            const data = localState[m];
+            if (data && data.length > 0) {
+              try {
+                const table = tableMap[m] || m;
+                for (let i = 0; i < data.length; i += 50) {
+                  const cleanBatch = data.slice(i, i + 50).map((d: any) => {
+                    const { items, payments, ...rest } = d;
+                    return camelToSnake(rest);
+                  });
+                  await (supabase as any).from(table).insert(cleanBatch);
+                }
+              } catch {}
+            }
+          }
+        }
 
         set({
           ...stateData,
@@ -245,23 +303,27 @@ export const useAppStore = create<AppStore>()(
         });
         return;
       } catch (err) {
-        console.error('Supabase init failed, falling back to mock data', err);
+        console.error('Supabase init failed, falling back to local/mock data', err);
       }
     }
 
-    const data = generateMockData();
-    const settingsArray: Setting[] = Object.entries(DEFAULT_SETTINGS).map(([key, value]) => ({
-      id: generateId(), key, value: String(value), updatedAt: new Date().toISOString(),
-    }));
-    set({
-      ...data, settings: settingsArray, paymentMethods: PAYMENT_METHODS,
-      isInitialized: true,
-    } as any);
-    get().addAuditLog({
-      timestamp: new Date().toISOString(), user: 'System', action: 'created',
-      module: 'system', recordId: 'init', oldValues: null,
-      newValues: { action: 'Application initialized with demo data' }, ip: '127.0.0.1',
-    });
+    if (hasLocalData) {
+      set({ isInitialized: true } as any);
+    } else {
+      const data = generateMockData();
+      const settingsArray: Setting[] = Object.entries(DEFAULT_SETTINGS).map(([key, value]) => ({
+        id: generateId(), key, value: String(value), updatedAt: new Date().toISOString(),
+      }));
+      set({
+        ...data, settings: settingsArray, paymentMethods: PAYMENT_METHODS,
+        isInitialized: true,
+      } as any);
+      get().addAuditLog({
+        timestamp: new Date().toISOString(), user: 'System', action: 'created',
+        module: 'system', recordId: 'init', oldValues: null,
+        newValues: { action: 'Application initialized with demo data' }, ip: '127.0.0.1',
+      });
+    }
   },
 
   resetToDemo: () => {
@@ -316,6 +378,29 @@ export const useAppStore = create<AppStore>()(
         language: state.language || 'en', theme: state.theme || 'light',
         sidebarCollapsed: state.sidebarCollapsed || false,
       });
+
+      if (isSupabaseConfigured) {
+        const tableMap: Record<string, string> = {
+          purchaseOrders: 'purchase_orders', treasuryAccounts: 'treasury_accounts',
+          treasuryTransactions: 'treasury_transactions', stockMovements: 'stock_movements',
+          journalEntries: 'journal_entries', chartOfAccounts: 'chart_of_accounts',
+          auditLogs: 'audit_logs', importHistory: 'import_sessions',
+          discountRules: 'discount_rules', paymentMethods: 'payment_methods',
+          payrollRecords: 'payroll_records', externalPurchases: 'external_purchases',
+          customerStatements: 'customer_statements', variants: 'product_variants',
+        };
+        const supabase = getSupabase();
+        for (const m of requiredModules) {
+          const data = state[m];
+          if (data && data.length > 0) {
+            try {
+              const table = tableMap[m] || m;
+              (supabase as any).from(table).insert(data.map((d: any) => camelToSnake(d))).then(() => {}).catch(() => {});
+            } catch {}
+          }
+        }
+      }
+
       return true;
     } catch (err) {
       console.error('Failed to load state:', err);
@@ -328,54 +413,54 @@ export const useAppStore = create<AppStore>()(
   addCustomer: (data) => {
     const customer: Customer = { ...data, id: generateId(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
     set((state) => ({ customers: [customer, ...state.customers] }));
-    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'created', module: 'customers', recordId: customer.id, oldValues: null, newValues: data, ip: '192.168.1.100' });
+    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'created', module: 'customers', recordId: customer.id, oldValues: null, newValues: data, ip: '' });
     syncToSupabase('post', 'customers', customer);
     return customer;
   },
   updateCustomer: (id, data) => {
     const old = get().customers.find(c => c.id === id);
     set((state) => ({ customers: state.customers.map(c => c.id === id ? { ...c, ...data, updatedAt: new Date().toISOString() } : c) }));
-    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'updated', module: 'customers', recordId: id, oldValues: old, newValues: data, ip: '192.168.1.100' });
+    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'updated', module: 'customers', recordId: id, oldValues: old, newValues: data, ip: '' });
     syncToSupabase('put', 'customers', { id, ...data });
   },
   deleteCustomer: (id) => {
     const old = get().customers.find(c => c.id === id);
     set((state) => ({ customers: state.customers.filter(c => c.id !== id) }));
-    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'deleted', module: 'customers', recordId: id, oldValues: old, newValues: null, ip: '192.168.1.100' });
+    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'deleted', module: 'customers', recordId: id, oldValues: old, newValues: null, ip: '' });
     syncToSupabase('delete', 'customers', { id });
   },
 
   addSupplier: (data) => {
     const supplier: Supplier = { ...data, id: generateId(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
     set((state) => ({ suppliers: [supplier, ...state.suppliers] }));
-    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'created', module: 'suppliers', recordId: supplier.id, oldValues: null, newValues: data, ip: '192.168.1.100' });
+    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'created', module: 'suppliers', recordId: supplier.id, oldValues: null, newValues: data, ip: '' });
     syncToSupabase('post', 'suppliers', supplier);
     return supplier;
   },
   updateSupplier: (id, data) => {
     const old = get().suppliers.find(s => s.id === id);
     set((state) => ({ suppliers: state.suppliers.map(s => s.id === id ? { ...s, ...data, updatedAt: new Date().toISOString() } : s) }));
-    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'updated', module: 'suppliers', recordId: id, oldValues: old, newValues: data, ip: '192.168.1.100' });
+    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'updated', module: 'suppliers', recordId: id, oldValues: old, newValues: data, ip: '' });
     syncToSupabase('put', 'suppliers', { id, ...data });
   },
   deleteSupplier: (id) => {
     const old = get().suppliers.find(s => s.id === id);
     set((state) => ({ suppliers: state.suppliers.filter(s => s.id !== id) }));
-    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'deleted', module: 'suppliers', recordId: id, oldValues: old, newValues: null, ip: '192.168.1.100' });
+    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'deleted', module: 'suppliers', recordId: id, oldValues: old, newValues: null, ip: '' });
     syncToSupabase('delete', 'suppliers', { id });
   },
 
   addProduct: (data) => {
     const product: Product = { ...data, id: generateId(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
     set((state) => ({ products: [product, ...state.products] }));
-    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'created', module: 'products', recordId: product.id, oldValues: null, newValues: data, ip: '192.168.1.100' });
+    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'created', module: 'products', recordId: product.id, oldValues: null, newValues: data, ip: '' });
     syncToSupabase('post', 'products', product);
     return product;
   },
   bulkAddProducts: (dataArr) => {
     const products = dataArr.map(data => ({ ...data, id: generateId(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } as Product));
     set((state) => ({ products: [...products, ...state.products] }));
-    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'created', module: 'products', recordId: `${products.length} bulk`, oldValues: null, newValues: { count: products.length }, ip: '192.168.1.100' });
+    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'created', module: 'products', recordId: `${products.length} bulk`, oldValues: null, newValues: { count: products.length }, ip: '' });
     if (isSupabaseConfigured) {
       try {
         const supabase = getSupabase();
@@ -387,13 +472,13 @@ export const useAppStore = create<AppStore>()(
   updateProduct: (id, data) => {
     const old = get().products.find(p => p.id === id);
     set((state) => ({ products: state.products.map(p => p.id === id ? { ...p, ...data, updatedAt: new Date().toISOString() } : p) }));
-    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'updated', module: 'products', recordId: id, oldValues: old, newValues: data, ip: '192.168.1.100' });
+    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'updated', module: 'products', recordId: id, oldValues: old, newValues: data, ip: '' });
     syncToSupabase('put', 'products', { id, ...data });
   },
   deleteProduct: (id) => {
     const old = get().products.find(p => p.id === id);
     set((state) => ({ products: state.products.filter(p => p.id !== id), variants: state.variants.filter(v => v.productId !== id) }));
-    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'deleted', module: 'products', recordId: id, oldValues: old, newValues: null, ip: '192.168.1.100' });
+    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'deleted', module: 'products', recordId: id, oldValues: old, newValues: null, ip: '' });
     syncToSupabase('delete', 'products', { id });
   },
 
@@ -430,20 +515,24 @@ export const useAppStore = create<AppStore>()(
   addInvoice: (data) => {
     const invoice: Invoice = { ...data, id: generateId(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
     set((state) => ({ invoices: [invoice, ...state.invoices] }));
-    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'created', module: 'invoices', recordId: invoice.id, oldValues: null, newValues: data, ip: '192.168.1.100' });
-    syncToSupabase('post', 'invoices', invoice);
+    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'created', module: 'invoices', recordId: invoice.id, oldValues: null, newValues: data, ip: '' });
+    const { items, payments, ...invoiceFields } = invoice;
+    syncToSupabase('post', 'invoices', invoiceFields);
+    if (items) {
+      items.forEach(item => syncToSupabase('post', 'invoice-items', { ...item, invoiceId: invoice.id }));
+    }
     return invoice;
   },
   updateInvoice: (id, data) => {
     const old = get().invoices.find(i => i.id === id);
     set((state) => ({ invoices: state.invoices.map(i => i.id === id ? { ...i, ...data, updatedAt: new Date().toISOString() } : i) }));
-    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'updated', module: 'invoices', recordId: id, oldValues: old, newValues: data, ip: '192.168.1.100' });
+    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'updated', module: 'invoices', recordId: id, oldValues: old, newValues: data, ip: '' });
     syncToSupabase('put', 'invoices', { id, ...data });
   },
   deleteInvoice: (id) => {
     const old = get().invoices.find(i => i.id === id);
     set((state) => ({ invoices: state.invoices.filter(i => i.id !== id) }));
-    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'deleted', module: 'invoices', recordId: id, oldValues: old, newValues: null, ip: '192.168.1.100' });
+    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'deleted', module: 'invoices', recordId: id, oldValues: old, newValues: null, ip: '' });
     syncToSupabase('delete', 'invoices', { id });
   },
 
@@ -461,56 +550,76 @@ export const useAppStore = create<AppStore>()(
           : i
       ),
     }));
-    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'updated', module: 'invoices', recordId: invoiceId, oldValues: null, newValues: { paidAmount: newPaidAmount, status: newStatus }, ip: '192.168.1.100' });
+    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'updated', module: 'invoices', recordId: invoiceId, oldValues: null, newValues: { paidAmount: newPaidAmount, status: newStatus }, ip: '' });
     syncToSupabase('post', 'invoicePayments', { ...data, invoiceId, id: payment.id, createdAt: payment.createdAt });
     syncToSupabase('put', 'invoices', { id: invoiceId, paidAmount: newPaidAmount, status: newStatus });
+    get().addTreasuryTransaction({
+      type: 'income', amount: payment.amount, date: data.paidAt?.split('T')[0] || new Date().toISOString().split('T')[0],
+      accountId: state.treasuryAccounts[0]?.id || '',
+      fromAccountId: null, toAccountId: null,
+      paymentMethod: data.paymentMethod, paymentMethodDetail: data.paymentMethod,
+      categoryId: '', description: `Payment for ${invoice.invoiceNumber}`,
+      descriptionAr: `دفعة للفاتورة ${invoice.invoiceNumber}`,
+      referenceNumber: data.reference || '', receiptUrl: '',
+      linkedInvoiceId: invoiceId, linkedPOId: null, linkedReturnId: null,
+      isRecurring: false, recurringPattern: null, nextOccurrence: null,
+      isReconciled: false, reconciledAt: null,
+    });
     return payment;
   },
 
   addQuotation: (data) => {
     const quotation: Quotation = { ...data, id: generateId(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
     set((state) => ({ quotations: [quotation, ...state.quotations] }));
-    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'created', module: 'quotations', recordId: quotation.id, oldValues: null, newValues: data, ip: '192.168.1.100' });
-    syncToSupabase('post', 'quotations', quotation);
+    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'created', module: 'quotations', recordId: quotation.id, oldValues: null, newValues: data, ip: '' });
+    const { items, ...quotationFields } = quotation;
+    syncToSupabase('post', 'quotations', quotationFields);
+    if (items) {
+      items.forEach(item => syncToSupabase('post', 'quotation-items', { ...item, quotationId: quotation.id }));
+    }
     return quotation;
   },
   updateQuotation: (id, data) => {
     const old = get().quotations.find(q => q.id === id);
     set((state) => ({ quotations: state.quotations.map(q => q.id === id ? { ...q, ...data, updatedAt: new Date().toISOString() } : q) }));
-    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'updated', module: 'quotations', recordId: id, oldValues: old, newValues: data, ip: '192.168.1.100' });
+    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'updated', module: 'quotations', recordId: id, oldValues: old, newValues: data, ip: '' });
     syncToSupabase('put', 'quotations', { id, ...data });
   },
   deleteQuotation: (id) => {
     const old = get().quotations.find(q => q.id === id);
     set((state) => ({ quotations: state.quotations.filter(q => q.id !== id) }));
-    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'deleted', module: 'quotations', recordId: id, oldValues: old, newValues: null, ip: '192.168.1.100' });
+    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'deleted', module: 'quotations', recordId: id, oldValues: old, newValues: null, ip: '' });
     syncToSupabase('delete', 'quotations', { id });
   },
 
   addPurchaseOrder: (data) => {
     const po: PurchaseOrder = { ...data, id: generateId(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
     set((state) => ({ purchaseOrders: [po, ...state.purchaseOrders] }));
-    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'created', module: 'purchaseOrders', recordId: po.id, oldValues: null, newValues: data, ip: '192.168.1.100' });
-    syncToSupabase('post', 'purchaseOrders', po);
+    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'created', module: 'purchaseOrders', recordId: po.id, oldValues: null, newValues: data, ip: '' });
+    const { items, ...poFields } = po;
+    syncToSupabase('post', 'purchaseOrders', poFields);
+    if (items) {
+      items.forEach(item => syncToSupabase('post', 'purchase-order-items', { ...item, purchaseOrderId: po.id }));
+    }
     return po;
   },
   updatePurchaseOrder: (id, data) => {
     const old = get().purchaseOrders.find(p => p.id === id);
     set((state) => ({ purchaseOrders: state.purchaseOrders.map(p => p.id === id ? { ...p, ...data, updatedAt: new Date().toISOString() } : p) }));
-    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'updated', module: 'purchaseOrders', recordId: id, oldValues: old, newValues: data, ip: '192.168.1.100' });
+    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'updated', module: 'purchaseOrders', recordId: id, oldValues: old, newValues: data, ip: '' });
     syncToSupabase('put', 'purchaseOrders', { id, ...data });
   },
   deletePurchaseOrder: (id) => {
     const old = get().purchaseOrders.find(p => p.id === id);
     set((state) => ({ purchaseOrders: state.purchaseOrders.filter(p => p.id !== id) }));
-    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'deleted', module: 'purchaseOrders', recordId: id, oldValues: old, newValues: null, ip: '192.168.1.100' });
+    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'deleted', module: 'purchaseOrders', recordId: id, oldValues: old, newValues: null, ip: '' });
     syncToSupabase('delete', 'purchaseOrders', { id });
   },
 
   addReturn: (data) => {
     const ret: Return = { ...data, id: generateId(), createdAt: new Date().toISOString() };
     set((state) => ({ returns: [ret, ...state.returns] }));
-    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'created', module: 'returns', recordId: ret.id, oldValues: null, newValues: data, ip: '192.168.1.100' });
+    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'created', module: 'returns', recordId: ret.id, oldValues: null, newValues: data, ip: '' });
     syncToSupabase('post', 'returns', ret);
     return ret;
   },
@@ -537,7 +646,7 @@ export const useAppStore = create<AppStore>()(
   addTreasuryTransaction: (data) => {
     const transaction: TreasuryTransaction = { ...data, id: generateId(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
     set((state) => ({ treasuryTransactions: [transaction, ...state.treasuryTransactions] }));
-    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'created', module: 'treasury', recordId: transaction.id, oldValues: null, newValues: data, ip: '192.168.1.100' });
+    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'created', module: 'treasury', recordId: transaction.id, oldValues: null, newValues: data, ip: '' });
     syncToSupabase('post', 'treasuryTransactions', transaction);
     return transaction;
   },
@@ -612,7 +721,7 @@ export const useAppStore = create<AppStore>()(
   addJournalEntry: (data) => {
     const entry: JournalEntry = { ...data, id: generateId(), createdAt: new Date().toISOString() };
     set((state) => ({ journalEntries: [entry, ...state.journalEntries] }));
-    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'created', module: 'journalEntries', recordId: entry.id, oldValues: null, newValues: data, ip: '192.168.1.100' });
+    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'created', module: 'journalEntries', recordId: entry.id, oldValues: null, newValues: data, ip: '' });
     syncToSupabase('post', 'journalEntries', entry);
     return entry;
   },
@@ -679,7 +788,7 @@ export const useAppStore = create<AppStore>()(
 
   clearModuleData: (module) => {
     set({ [module]: [] } as any);
-    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'deleted', module, recordId: 'all', oldValues: null, newValues: null, ip: '192.168.1.100' });
+    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'deleted', module, recordId: 'all', oldValues: null, newValues: null, ip: '' });
   },
 
   addDiscountRule: (data) => {
@@ -711,23 +820,23 @@ export const useAppStore = create<AppStore>()(
   addExternalPurchase: (data) => {
     const purchase: ExternalPurchase = { ...data, id: generateId(), createdAt: new Date().toISOString() };
     set((state) => ({ externalPurchases: [purchase, ...state.externalPurchases] }));
-    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'created', module: 'externalPurchases', recordId: purchase.id, oldValues: null, newValues: data, ip: '192.168.1.100' });
+    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'created', module: 'externalPurchases', recordId: purchase.id, oldValues: null, newValues: data, ip: '' });
     syncToSupabase('post', 'externalPurchases', purchase);
     return purchase;
   },
   bulkAddExternalPurchases: (dataArr) => {
     const purchases = dataArr.map(data => ({ ...data, id: generateId(), createdAt: new Date().toISOString() } as ExternalPurchase));
     set((state) => ({ externalPurchases: [...purchases, ...state.externalPurchases] }));
-    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'created', module: 'externalPurchases', recordId: `${purchases.length} bulk`, oldValues: null, newValues: { count: purchases.length }, ip: '192.168.1.100' });
+    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'created', module: 'externalPurchases', recordId: `${purchases.length} bulk`, oldValues: null, newValues: { count: purchases.length }, ip: '' });
     if (isSupabaseConfigured) {
-      try { (getSupabase() as any).from('externalPurchases').insert(purchases).then(() => {}).catch(() => {}); } catch {}
+      try { (getSupabase() as any).from('external_purchases').insert(purchases).then(() => {}).catch(() => {}); } catch {}
     }
     return purchases;
   },
   deleteExternalPurchase: (id) => {
     const old = get().externalPurchases.find(p => p.id === id);
     set((state) => ({ externalPurchases: state.externalPurchases.filter(p => p.id !== id) }));
-    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'deleted', module: 'externalPurchases', recordId: id, oldValues: old, newValues: null, ip: '192.168.1.100' });
+    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'deleted', module: 'externalPurchases', recordId: id, oldValues: old, newValues: null, ip: '' });
     syncToSupabase('delete', 'externalPurchases', { id });
   },
   updateExternalPurchaseProductId: (id, productId) => {
@@ -751,8 +860,9 @@ export const useAppStore = create<AppStore>()(
     return data;
   },
   merge: (persisted: any, current: any) => {
-    if (persisted?.customers?.length > 0 || persisted?.products?.length > 0) {
-      return { ...current, ...persisted, isInitialized: true };
+    const hasAnyData = persisted && Object.values(persisted).some((v: any) => Array.isArray(v) && v.length > 0);
+    if (hasAnyData) {
+      return { ...current, ...persisted, isInitialized: isSupabaseConfigured ? false : true };
     }
     return current;
   },

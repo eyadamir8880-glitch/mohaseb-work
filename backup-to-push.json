@@ -1,0 +1,103 @@
+{
+  "version": "1.0",
+  "exportedAt": "2026-06-22T23:16:21.885Z",
+  "language": "en",
+  "theme": "light",
+  "customers": [
+    {
+      "name": "khaled",
+      "nameAr": "",
+      "phone": "",
+      "email": "",
+      "address": "",
+      "taxNumber": "",
+      "creditLimit": 0,
+      "totalInvoiced": 0,
+      "totalPaid": 0,
+      "totalDue": 0,
+      "customPricingRules": [],
+      "id": "6c82875f-c242-428c-b4b9-a5ae3dd884f8",
+      "createdAt": "2026-06-22T23:12:18.049Z",
+      "updatedAt": "2026-06-22T23:12:18.049Z"
+    },
+    {
+      "name": "amir",
+      "nameAr": "amir",
+      "phone": "",
+      "email": "",
+      "address": "",
+      "taxNumber": "",
+      "creditLimit": 0,
+      "totalInvoiced": 0,
+      "totalPaid": 0,
+      "totalDue": 0,
+      "customPricingRules": [],
+      "id": "73a8aae4-bbd5-48e4-a5d2-93ebd1fa5730",
+      "createdAt": "2026-06-22T23:11:55.996Z",
+      "updatedAt": "2026-06-22T23:11:55.996Z"
+    },
+    {
+      "name": "Eyad Amir",
+      "nameAr": "Eyad Amir",
+      "phone": "",
+      "email": "eyadamir8880@gmail.com",
+      "address": "Mohammed nagib",
+      "taxNumber": "",
+      "creditLimit": 0,
+      "totalInvoiced": 0,
+      "totalPaid": 0,
+      "totalDue": 0,
+      "customPricingRules": [],
+      "id": "380dba56-49e2-4d50-8ec3-dd8fd152a5a6",
+      "createdAt": "2026-06-22T23:11:37.329Z",
+      "updatedAt": "2026-06-22T23:11:37.329Z"
+    }
+  ],
+  "suppliers": [],
+  "products": [
+    { "name": "ردياتير فليشيا", "sellingPrice": 1050, "sku": "501408", "trackInventory": true, "stock": 0, "id": "58d9d27f-e506-4513-b5ec-c8d9821f2958", "createdAt": "2026-06-22T23:09:47.989Z", "updatedAt": "2026-06-22T23:09:47.989Z", "unitOfMeasure": "piece", "baseUnit": "piece", "conversionRate": 1, "lowStockThreshold": 0, "reorderPoint": 0, "hasVariants": false, "alternateSkus": [], "purchasePrice": 0, "barcode": "", "description": "", "descriptionAr": "", "categoryId": "", "imageUrl": "", "nameAr": "" },
+    { "name": "ردياتير تيجوان\r\n2009 -2022", "sellingPrice": 2700, "sku": "501400", "trackInventory": true, "stock": 0, "id": "63be1662-b0b0-4888-836f-76bb9f1a793e", "createdAt": "2026-06-22T23:09:47.989Z", "updatedAt": "2026-06-22T23:09:47.989Z", "unitOfMeasure": "piece", "baseUnit": "piece", "conversionRate": 1, "lowStockThreshold": 0, "reorderPoint": 0, "hasVariants": false, "alternateSkus": [], "purchasePrice": 0, "barcode": "", "description": "", "descriptionAr": "", "categoryId": "", "imageUrl": "", "nameAr": "" },
+    { "name": "ردياتير باسات B8", "sellingPrice": 2400, "sku": "501401", "trackInventory": true, "stock": 0, "id": "8e68ef87-1647-4506-a78b-4d16582d4e13", "createdAt": "2026-06-22T23:09:47.989Z", "updatedAt": "2026-06-22T23:09:47.989Z", "unitOfMeasure": "piece", "baseUnit": "piece", "conversionRate": 1, "lowStockThreshold": 0, "reorderPoint": 0, "hasVariants": false, "alternateSkus": [], "purchasePrice": 0, "barcode": "", "description": "", "descriptionAr": "", "categoryId": "", "imageUrl": "", "nameAr": "" }
+  ],
+  "invoices": [
+    {
+      "invoiceNumber": "INV-003",
+      "customerId": "380dba56-49e2-4d50-8ec3-dd8fd152a5a6",
+      "items": [{ "id": "58ef44ad-c4f2-4593-ab7a-68f1f9b2f9e5", "productId": "80a91882-5e99-4cab-beac-b3c867b7674f", "productName": "سربنتينا داخلي A5", "quantity": "4", "unitPrice": 1800, "lineTotal": 7200, "taxPercent": 14 }],
+      "subtotal": 7200, "taxTotal": 1008, "grandTotal": 8208, "paidAmount": 2000.01,
+      "status": "partially_paid", "issueDate": "2026-06-22", "dueDate": "2026-07-22",
+      "payments": [{ "invoiceId": "6012f644-c762-4685-89c3-3d9a92ad8cd6", "amount": 2000.01, "paymentMethod": "vodafone_cash_eyad", "id": "6622a508-7fe4-40e1-9bdf-65fadfff4d45", "createdAt": "2026-06-22T23:14:41.920Z" }],
+      "id": "6012f644-c762-4685-89c3-3d9a92ad8cd6", "createdAt": "2026-06-22T23:14:05.864Z", "updatedAt": "2026-06-22T23:14:41.920Z"
+    },
+    {
+      "invoiceNumber": "INV-002",
+      "customerId": "73a8aae4-bbd5-48e4-a5d2-93ebd1fa5730",
+      "items": [{ "id": "226595a1-a9f2-45b7-a1b8-4f0687cef2b7", "productId": "75ed8f1f-824d-412c-9703-25a06e154e23", "productName": "سربنتينا داخلي باسات", "quantity": "10", "unitPrice": 1950, "lineTotal": 19500, "taxPercent": 14 }],
+      "subtotal": 19500, "taxTotal": 2730, "grandTotal": 22230, "paidAmount": 22230,
+      "status": "partially_paid", "issueDate": "2026-06-22", "dueDate": "2026-07-22",
+      "payments": [{ "invoiceId": "463bd9b1-a4a9-404d-a364-b720bec20756", "amount": 22230, "paymentMethod": "cash", "id": "80165327-9a35-48e5-a977-db8498750963", "createdAt": "2026-06-22T23:14:56.336Z" }],
+      "id": "463bd9b1-a4a9-404d-a364-b720bec20756", "createdAt": "2026-06-22T23:13:40.709Z", "updatedAt": "2026-06-22T23:14:56.336Z"
+    },
+    {
+      "invoiceNumber": "INV-001",
+      "customerId": "6c82875f-c242-428c-b4b9-a5ae3dd884f8",
+      "items": [{ "id": "c0910626-0034-450c-89f7-e572a7a5bca8", "productId": "609e8bc7-f8c4-413a-8d30-2c172c0bef19", "productName": "طلمبة مياه كهرباء اودى A4 & باسات B9", "quantity": "10", "unitPrice": 5000, "lineTotal": 50000, "taxPercent": 14 }],
+      "subtotal": 50000, "taxTotal": 7000, "grandTotal": 57000, "paidAmount": 0,
+      "status": "draft", "issueDate": "2026-06-22", "dueDate": "2026-07-22",
+      "payments": [],
+      "id": "89179deb-9be5-4a45-b67b-889a475d9d0f", "createdAt": "2026-06-22T23:12:48.307Z", "updatedAt": "2026-06-22T23:12:48.307Z"
+    }
+  ],
+  "paymentMethods": [
+    {"id":"cash","name":"Cash","nameAr":"نقداً","type":"cash","isActive":true,"isProtected":true,"sortOrder":1},
+    {"id":"bank","name":"Bank Transfer","nameAr":"تحويل بنكي","type":"bank","isActive":true,"isProtected":true,"sortOrder":2},
+    {"id":"card","name":"Card","nameAr":"بطاقة","type":"card","isActive":true,"isProtected":true,"sortOrder":3},
+    {"id":"check","name":"Check","nameAr":"شيك","type":"check","isActive":true,"isProtected":true,"sortOrder":4},
+    {"id":"vodafone_cash_omar","name":"Vodafone Cash - Omar","nameAr":"فودافون كاش عمر","type":"vodafone_cash","isActive":true,"isProtected":true,"sortOrder":5},
+    {"id":"vodafone_cash_amir","name":"Vodafone Cash - Amir","nameAr":"فودافون كاش امير","type":"vodafone_cash","isActive":true,"isProtected":true,"sortOrder":6},
+    {"id":"vodafone_cash_islam","name":"Vodafone Cash - Islam","nameAr":"فودافون كاش اسلام","type":"vodafone_cash","isActive":true,"isProtected":true,"sortOrder":7},
+    {"id":"vodafone_cash_eyad","name":"Vodafone Cash - Eyad","nameAr":"فودافون كاش اياد","type":"vodafone_cash","isActive":true,"isProtected":true,"sortOrder":8},
+    {"id":"instapay_amir","name":"InstaPay - Amir","nameAr":"انستا باي امير","type":"instapay","isActive":true,"isProtected":true,"sortOrder":9},
+    {"id":"instapay_islam","name":"InstaPay - Islam","nameAr":"انستا باي اسلام","type":"instapay","isActive":true,"isProtected":true,"sortOrder":10}
+  ]
+}

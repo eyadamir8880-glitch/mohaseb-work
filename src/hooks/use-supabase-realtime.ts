@@ -39,10 +39,14 @@ const TABLE_MODULE_MAP: Record<string, string> = {
   deliveries: 'deliveries',
 };
 
+const POLL_MODULES = ['invoices', 'products', 'customers', 'suppliers', 'quotations', 'purchaseOrders', 'returns', 'treasuryTransactions', 'stockMovements'];
+
 export function useSupabaseRealtime() {
   const isInitialized = useAppStore((s) => s.isInitialized);
   const channelRef = useRef<RealtimeChannel | null>(null);
   const debounceRef = useRef<Record<string, number>>({});
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastPollRef = useRef<Record<string, string>>({});
 
   useEffect(() => {
     if (!isSupabaseConfigured || !isInitialized) return;
@@ -75,15 +79,57 @@ export function useSupabaseRealtime() {
           }, 500);
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('Supabase Realtime status:', status);
+      });
 
     channelRef.current = channel;
+
+    // Polling fallback: every 5 seconds check key modules for changes
+    const startPolling = () => {
+      pollIntervalRef.current = setInterval(async () => {
+        for (const module of POLL_MODULES) {
+          try {
+            const res = await apiClient.get<any[]>(module, { limit: 1 });
+            if (res.data && res.data.length > 0) {
+              const latestId = res.data[0].id;
+              if (lastPollRef.current[module] && lastPollRef.current[module] !== latestId) {
+                const full = await apiClient.get<any[]>(module);
+                if (full.data) {
+                  useAppStore.setState({ [module]: full.data });
+                }
+              }
+              lastPollRef.current[module] = latestId;
+            }
+          } catch {}
+        }
+      }, 5000);
+    };
+
+    // Only poll when page is visible
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        if (!pollIntervalRef.current) startPolling();
+      } else {
+        if (pollIntervalRef.current) {
+          clearInterval(pollIntervalRef.current);
+          pollIntervalRef.current = null;
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', onVisibility);
+    startPolling();
 
     return () => {
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
       }
       Object.values(debounceRef.current).forEach(clearTimeout);
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+      }
+      document.removeEventListener('visibilitychange', onVisibility);
     };
   }, [isInitialized]);
 }

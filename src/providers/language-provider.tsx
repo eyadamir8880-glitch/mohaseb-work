@@ -4,8 +4,8 @@ import { createContext, useContext, useEffect, type ReactNode } from 'react';
 import { useAppStore } from '@/stores/use-app-store';
 
 // Import translations
-import enMessages from '@/messages/en.json';
-import arMessages from '@/messages/ar.json';
+import enMessages from '@/i18n/en';
+import arMessages from '@/i18n/ar';
 
 interface LanguageContextType {
   language: 'en' | 'ar';

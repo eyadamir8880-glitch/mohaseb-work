@@ -93,9 +93,10 @@ export default function InvoicesPage() {
     });
   };
 
-  const calcSubtotal = () => createForm.items.reduce((sum, i) => sum + i.lineTotal * (1 + i.taxPercent / 100), 0);
-  const calcDiscount = () => createForm.items.reduce((sum, i) => sum + i.lineTotal * (i.discountPercent / 100), 0);
-  const calcGrandTotal = () => createForm.items.reduce((sum, i) => sum + i.lineTotal * (1 + i.taxPercent / 100), 0);
+  const calcSubtotal = () => createForm.items.reduce((sum, i) => sum + Number(i.quantity) * Number(i.unitPrice), 0);
+  const calcDiscount = () => createForm.items.reduce((sum, i) => sum + Number(i.quantity) * Number(i.unitPrice) * Number(i.discountPercent) / 100, 0);
+  const calcTax = () => createForm.items.reduce((sum, i) => sum + Number(i.lineTotal) * Number(i.taxPercent) / 100, 0);
+  const calcGrandTotal = () => createForm.items.reduce((sum, i) => sum + Number(i.lineTotal) * (1 + Number(i.taxPercent) / 100), 0);
 
   const handleCreateInvoice = () => {
     if (!createForm.customerId || createForm.items.length === 0) return;
@@ -358,7 +359,15 @@ export default function InvoicesPage() {
               <span>{t('invoices.subtotal')}</span>
               <span>{formatCurrency(calcSubtotal(), 'EGP', locale)}</span>
             </div>
-            <div className="flex justify-between w-64 font-bold">
+            <div className="flex justify-between w-64">
+              <span>{t('invoices.discountTotal')}</span>
+              <span className="text-red-600">-{formatCurrency(calcDiscount(), 'EGP', locale)}</span>
+            </div>
+            <div className="flex justify-between w-64">
+              <span>{t('invoices.taxTotal')}</span>
+              <span>{formatCurrency(calcTax(), 'EGP', locale)}</span>
+            </div>
+            <div className="flex justify-between w-64 font-bold border-t pt-1">
               <span>{t('invoices.grandTotal')}</span>
               <span>{formatCurrency(calcGrandTotal(), 'EGP', locale)}</span>
             </div>

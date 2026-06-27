@@ -64,7 +64,6 @@ export default function CustomerAccountPage() {
         credit: 0,
         type: 'invoice',
       });
-      openingBalance -= total;
 
       if (inv.payments?.length) {
         inv.payments.forEach((p: any) => {
@@ -77,7 +76,6 @@ export default function CustomerAccountPage() {
             credit: p.amount,
             type: 'payment',
           });
-          openingBalance += p.amount;
         });
       }
     });
@@ -93,7 +91,7 @@ export default function CustomerAccountPage() {
         type: s.type,
       });
       if (s.type === 'opening_balance') {
-        openingBalance = s.credit - s.debit;
+        openingBalance = s.debit - s.credit;
       }
     });
 
@@ -104,7 +102,7 @@ export default function CustomerAccountPage() {
     let runningBalance = openingBalance;
 
     const withBalance = rows.map(r => {
-      runningBalance += r.credit - r.debit;
+      runningBalance += r.debit - r.credit;
       return { ...r, balance: runningBalance };
     });
 
@@ -113,7 +111,7 @@ export default function CustomerAccountPage() {
       openingBalance,
       totalDebit,
       totalCredit,
-      closingBalance: openingBalance + totalCredit - totalDebit,
+      closingBalance: openingBalance + totalDebit - totalCredit,
     };
   }, [customerInvoices, statements]);
 

@@ -18,11 +18,15 @@ export function ApiProvider({ children }: { children: ReactNode }) {
     if (isInitialized) return;
 
     const tryInit = () => {
-      const state = useAppStore.getState();
-      if (state.customers.length > 0 || state.products.length > 0) {
-        useAppStore.setState({ isInitialized: true });
-      } else {
+      if (isSupabaseConfigured) {
         initializeStore();
+      } else {
+        const state = useAppStore.getState();
+        if (state.customers.length > 0 || state.products.length > 0) {
+          useAppStore.setState({ isInitialized: true });
+        } else {
+          initializeStore();
+        }
       }
     };
 

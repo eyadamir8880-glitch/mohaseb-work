@@ -46,12 +46,14 @@ const endpointToTable: Record<string, string> = {
   'customers': 'customers',
   'suppliers': 'suppliers',
   'products': 'products',
-  'variants': 'variants',
+   'variants': 'product_variants',
   'categories': 'categories',
   'invoices': 'invoices',
   'invoice-items': 'invoice_items',
   'quotations': 'quotations',
+  'quotation-items': 'quotation_items',
   'purchase-orders': 'purchase_orders',
+  'purchase-order-items': 'purchase_order_items',
   'purchaseOrders': 'purchase_orders',
   'returns': 'returns',
   'treasury-accounts': 'treasury_accounts',
@@ -67,12 +69,13 @@ const endpointToTable: Record<string, string> = {
   'journalEntries': 'journal_entries',
   'chart-of-accounts': 'chart_of_accounts',
   'chartOfAccounts': 'chart_of_accounts',
+  'invoicePayments': 'invoice_payments',
   'notifications': 'notifications',
   'audit-logs': 'audit_logs',
   'auditLogs': 'audit_logs',
   'settings': 'settings',
-  'import-history': 'import_history',
-  'importHistory': 'import_history',
+   'import-history': 'import_sessions',
+   'importHistory': 'import_sessions',
   'discount-rules': 'discount_rules',
   'discountRules': 'discount_rules',
   'payment-methods': 'payment_methods',
@@ -221,7 +224,7 @@ export const apiClient = {
           record_id: (inserted as any)?.id || '',
           old_values: null,
           new_values: camelToSnake(data),
-          ip: '192.168.1.100',
+          ip: '',
         });
 
         return responseInterceptor({ data: snakeToCamel(inserted), status: 201, message: 'Created successfully' });
@@ -265,7 +268,7 @@ export const apiClient = {
           record_id: id,
           old_values: oldData || null,
           new_values: camelToSnake(data),
-          ip: '192.168.1.100',
+          ip: '',
         });
 
         return responseInterceptor({ data: snakeToCamel(updated), status: 200, message: 'Updated successfully' });
@@ -304,7 +307,7 @@ export const apiClient = {
           record_id: id,
           old_values: oldData || null,
           new_values: null,
-          ip: '192.168.1.100',
+          ip: '',
         });
 
         return responseInterceptor({ data: snakeToCamel(oldData), status: 200, message: 'Deleted successfully' });
@@ -663,7 +666,7 @@ function createAuditLog(action: AuditLog['action'], module: string, recordId: st
     recordId: recordId || newValues?.id || '',
     oldValues: oldValues || null,
     newValues: newValues || null,
-    ip: '192.168.1.100',
+    ip: '',
     createdAt: new Date().toISOString(),
   };
 }

@@ -33,14 +33,14 @@ export default function QuotationsPage() {
 
   const handleConvertToInvoice = (quotation: any) => {
     const newInvoiceNum = `INV-${String(store.invoices.length + 1).padStart(3, '0')}`;
-    store.addInvoice({
+    const invoice = store.addInvoice({
       invoiceNumber: newInvoiceNum, customerId: quotation.customerId, items: quotation.items.map((i: any) => ({ ...i })),
       subtotal: quotation.subtotal, taxTotal: quotation.taxTotal, discountTotal: quotation.discountTotal,
       grandTotal: quotation.grandTotal, paidAmount: 0, status: 'draft', issueDate: new Date().toISOString().split('T')[0],
       dueDate: '', notes: `Converted from ${quotation.quotationNumber}`, terms: '', deliveryInfo: null, treasuryTransactionId: null, payments: [],
     });
-    store.updateQuotation(quotation.id, { status: 'converted', convertedInvoiceId: 'pending' });
-    store.addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'updated', module: 'quotations', recordId: quotation.id, oldValues: null, newValues: { status: 'converted' }, ip: '192.168.1.100' });
+    store.updateQuotation(quotation.id, { status: 'converted', convertedInvoiceId: invoice.id });
+    store.addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'updated', module: 'quotations', recordId: quotation.id, oldValues: null, newValues: { status: 'converted' }, ip: window.location.hostname || '127.0.0.1' });
   };
 
   const columns = [
@@ -142,15 +142,49 @@ function QuotationForm({ quotationId, onSave, onCancel }: { quotationId: string 
   const [issueDate, setIssueDate] = useState(existing?.issueDate || new Date().toISOString().split('T')[0]);
   const [expiryDate, setExpiryDate] = useState(existing?.expiryDate || new Date(Date.now() + 14*24*60*60*1000).toISOString().split('T')[0]);
   const [status, setStatus] = useState(existing?.status || 'draft');
+  const [items, setItems] = useState(existing?.items || [{ id: '', productId: '', productName: '', productNameAr: '', sku: '', quantity: 1, unitPrice: 0, discountPercent: 0, taxPercent: 14, lineTotal: 0 }]);
+
+  const handleItemChange = (index: number, field: string, value: string | number) => {
+    setItems(prev => {
+      const updated = [...prev];
+      const item = { ...updated[index], [field]: value };
+      if (field === 'productId') {
+        const product = store.products.find(p => p.id === value);
+        if (product) {
+          item.productName = product.name;
+          item.productNameAr = product.nameAr || '';
+          item.unitPrice = product.sellingPrice;
+        }
+      }
+      const qty = field === 'quantity' ? Number(value) : item.quantity;
+      const price = field === 'unitPrice' ? Number(value) : item.unitPrice;
+      const disc = field === 'discountPercent' ? Number(value) : item.discountPercent;
+      item.lineTotal = qty * price * (1 - disc / 100);
+      updated[index] = item;
+      return updated;
+    });
+  };
+
+  const addItem = () => setItems(prev => [...prev, { id: '', productId: '', productName: '', productNameAr: '', sku: '', quantity: 1, unitPrice: 0, discountPercent: 0, taxPercent: 14, lineTotal: 0 }]);
+  const removeItem = (index: number) => setItems(prev => prev.filter((_, i) => i !== index));
+
+  const calcTotals = () => {
+    const subtotal = items.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
+    const discountTotal = items.reduce((s, i) => s + i.quantity * i.unitPrice * i.discountPercent / 100, 0);
+    const taxTotal = items.reduce((s, i) => s + i.lineTotal * i.taxPercent / 100, 0);
+    const grandTotal = items.reduce((s, i) => s + i.lineTotal * (1 + i.taxPercent / 100), 0);
+    return { subtotal, discountTotal, taxTotal, grandTotal };
+  };
 
   const handleSave = () => {
-    const items = [{ id: '1', productId: '', variantId: null, productName: 'Sample', productNameAr: 'عينة', sku: 'SMP', quantity: 1, unitPrice: 100, discountPercent: 0, taxPercent: 14, lineTotal: 114 }];
+    const { subtotal, taxTotal, discountTotal, grandTotal } = calcTotals();
+    const quotationItems = items.map(i => ({ ...i, id: i.id || crypto.randomUUID(), variantId: null }));
     if (existing) {
-      store.updateQuotation(existing.id, { customerId, issueDate, expiryDate, status: status as any, items, subtotal: 100, taxTotal: 14, discountTotal: 0, grandTotal: 114 });
+      store.updateQuotation(existing.id, { customerId, issueDate, expiryDate, status: status as any, items: quotationItems, subtotal, taxTotal, discountTotal, grandTotal });
     } else {
       store.addQuotation({
         quotationNumber: `QT-${String(store.quotations.length + 1).padStart(3, '0')}`,
-        customerId, items, subtotal: 100, taxTotal: 14, discountTotal: 0, grandTotal: 114,
+        customerId, items: quotationItems, subtotal, taxTotal, discountTotal, grandTotal,
         status: status as any, issueDate, expiryDate, notes: '', terms: '', convertedInvoiceId: null,
       });
     }
@@ -172,9 +206,66 @@ function QuotationForm({ quotationId, onSave, onCancel }: { quotationId: string 
             { value: 'rejected', label: t('quotations.status.rejected') },
           ]} />
       </div>
+
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <label className="text-sm font-medium">{t('invoices.items')}</label>
+          <Button variant="outline" size="sm" onClick={addItem}>
+            <svg className="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            {t('invoices.addItem')}
+          </Button>
+        </div>
+        {items.map((item, i) => (
+          <div key={i} className="flex gap-2 items-end">
+            <Select value={item.productId}
+              onChange={(e) => handleItemChange(i, 'productId', e.target.value)}
+              options={store.products.map(p => ({ value: p.id, label: language === 'ar' ? p.nameAr || p.name : p.name }))}
+              placeholder={t('app.select')} className="flex-[2]" />
+            <Input type="number" min="1" value={item.quantity}
+              onChange={(e) => handleItemChange(i, 'quantity', e.target.value)}
+              className="w-20" label={t('invoices.quantity')} />
+            <Input type="number" min="0" step="0.01" value={item.unitPrice}
+              onChange={(e) => handleItemChange(i, 'unitPrice', e.target.value)}
+              className="w-24" label={t('invoices.unitPrice')} />
+            <Input type="number" min="0" max="100" step="1" value={item.discountPercent}
+              onChange={(e) => handleItemChange(i, 'discountPercent', e.target.value)}
+              className="w-20" label={t('invoices.discount')} />
+            <div className="text-sm font-medium w-24 text-right pt-5">
+              {formatCurrency(item.lineTotal * (1 + item.taxPercent / 100), 'EGP', language)}
+            </div>
+            <button className="btn-ghost btn-sm p-1 mb-1 text-red-600" onClick={() => removeItem(i)}>
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex flex-col items-end gap-1 text-sm border-t pt-3">
+        {(() => { const { subtotal, taxTotal, grandTotal } = calcTotals(); return (
+          <>
+            <div className="flex justify-between w-64">
+              <span>{t('invoices.subtotal')}</span>
+              <span>{formatCurrency(subtotal, 'EGP', language)}</span>
+            </div>
+            <div className="flex justify-between w-64">
+              <span>{t('invoices.taxTotal')}</span>
+              <span>{formatCurrency(taxTotal, 'EGP', language)}</span>
+            </div>
+            <div className="flex justify-between w-64 font-bold">
+              <span>{t('invoices.grandTotal')}</span>
+              <span>{formatCurrency(grandTotal, 'EGP', language)}</span>
+            </div>
+          </>
+        );})()}
+      </div>
+
       <div className="flex justify-end gap-2">
         <Button variant="outline" onClick={onCancel}>{t('app.cancel')}</Button>
-        <Button onClick={handleSave}>{t('app.save')}</Button>
+        <Button onClick={handleSave} disabled={!customerId || items.length === 0 || items.some(i => !i.productId)}>{t('app.save')}</Button>
       </div>
     </div>
   );
