@@ -31,6 +31,8 @@ const TABLE_MODULE_MAP: Record<string, string> = {
   import_sessions: 'importHistory',
   discount_rules: 'discountRules',
   payment_methods: 'paymentMethods',
+  external_purchases: 'externalPurchases',
+  customer_statements: 'customerStatements',
   invoice_items: 'invoiceItems',
   invoice_payments: 'payments',
   quotation_items: 'quotationItems',
@@ -39,7 +41,15 @@ const TABLE_MODULE_MAP: Record<string, string> = {
   deliveries: 'deliveries',
 };
 
-const POLL_MODULES = ['invoices', 'products', 'customers', 'suppliers', 'quotations', 'purchaseOrders', 'returns', 'treasuryTransactions', 'stockMovements'];
+const POLL_MODULES = [
+  'customers', 'suppliers', 'products', 'variants', 'categories',
+  'invoices', 'quotations', 'purchaseOrders', 'returns',
+  'treasuryAccounts', 'treasuryTransactions', 'warehouses',
+  'stockMovements', 'employees', 'payrollRecords', 'assets',
+  'journalEntries', 'chartOfAccounts', 'notifications', 'auditLogs',
+  'settings', 'importHistory', 'discountRules', 'paymentMethods',
+  'externalPurchases', 'customerStatements',
+];
 
 export function useSupabaseRealtime() {
   const isInitialized = useAppStore((s) => s.isInitialized);
