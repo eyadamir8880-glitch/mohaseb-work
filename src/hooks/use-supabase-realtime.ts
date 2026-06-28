@@ -158,7 +158,10 @@ export function useSupabaseRealtime() {
               lastPollRef.current[module] = { id: record.id, createdAt: record.createdAt };
             } else {
               if (state && state.id !== null) {
-                useAppStore.setState({ [module]: [] });
+                const full = await apiClient.get<any[]>(module);
+                if (full.data) {
+                  mergeWithLocal(module, full.data);
+                }
               }
               lastPollRef.current[module] = { id: null, createdAt: null };
             }
