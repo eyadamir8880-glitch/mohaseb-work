@@ -122,6 +122,9 @@ async function supabaseGet<T>(endpoint: string, params?: Record<string, any>): P
     return supabaseGetDashboard() as any;
   }
 
+  const tablesWithoutCreatedAt = ['payment_methods', 'import_sessions', 'settings'];
+  const hasCreatedAt = !tablesWithoutCreatedAt.includes(table);
+
   let query = (getSupabase() as any).from(table).select('*');
 
   if (params) {
@@ -132,8 +135,8 @@ async function supabaseGet<T>(endpoint: string, params?: Record<string, any>): P
     if (params.categoryId) query = query.eq('category_id', params.categoryId);
     if (params.customerId) query = query.eq('customer_id', params.customerId);
     if (params.supplierId) query = query.eq('supplier_id', params.supplierId);
-    if (params.dateFrom) query = query.gte('created_at', params.dateFrom);
-    if (params.dateTo) query = query.lte('created_at', params.dateTo);
+    if (params.dateFrom && hasCreatedAt) query = query.gte('created_at', params.dateFrom);
+    if (params.dateTo && hasCreatedAt) query = query.lte('created_at', params.dateTo);
     if (params.type) query = query.eq('type', params.type);
     if (params.productId) query = query.eq('product_id', params.productId);
     if (params.invoiceId) query = query.eq('invoice_id', params.invoiceId);
@@ -144,12 +147,12 @@ async function supabaseGet<T>(endpoint: string, params?: Record<string, any>): P
     if (params.module) query = query.eq('module', params.module);
     if (params.sortBy) {
       query = query.order(params.sortBy, { ascending: params.sortOrder === 'asc' });
-    } else {
+    } else if (hasCreatedAt) {
       query = query.order('created_at', { ascending: false });
     }
     if (params.limit) query = query.limit(params.limit);
     if (params.offset) query = query.range(params.offset, params.offset + (params.limit || 10) - 1);
-  } else {
+  } else if (hasCreatedAt) {
     query = query.order('created_at', { ascending: false });
   }
 
@@ -211,7 +214,7 @@ export const apiClient = {
         }
         const { data: inserted, error } = await (getSupabase() as any)
           .from(table)
-          .insert(camelToSnake(data))
+          .upsert(camelToSnake(data), { onConflict: 'id', ignoreDuplicates: false })
           .select()
           .single();
         if (error) throw { code: 'SUPABASE_ERROR', message: error.message };

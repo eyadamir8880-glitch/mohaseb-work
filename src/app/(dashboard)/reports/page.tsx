@@ -14,6 +14,7 @@ export default function ReportsPage() {
   const store = useAppStore();
   const [dateFrom, setDateFrom] = useState(new Date(Date.now() - 90*24*60*60*1000).toISOString().split('T')[0]);
   const [dateTo, setDateTo] = useState(new Date().toISOString().split('T')[0]);
+  const [activeTab, setActiveTab] = useState('financial');
 
   const filteredInvoices = useMemo(() => {
     return store.invoices.filter(i => {
@@ -33,8 +34,7 @@ export default function ReportsPage() {
   const profitLoss = useMemo(() => {
     const revenue = filteredTransactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
     const expenses = filteredTransactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
-    const invoiceTotal = filteredInvoices.filter(i => i.status === 'paid' || i.status === 'partially_paid').reduce((s, i) => s + i.grandTotal, 0);
-    return { revenue, expenses, netProfit: revenue - expenses, invoiceTotal };
+    return { revenue, expenses, netProfit: revenue - expenses };
   }, [filteredTransactions, filteredInvoices]);
 
   // Payment method breakdown
@@ -51,7 +51,7 @@ export default function ReportsPage() {
   const salesByProduct = useMemo(() => {
     const productSales: Record<string, { qty: number; total: number }> = {};
     filteredInvoices.filter(i => i.status === 'paid' || i.status === 'partially_paid').forEach(inv => {
-      inv.items.forEach(item => {
+      (inv.items || []).forEach(item => {
         if (!productSales[item.productId]) productSales[item.productId] = { qty: 0, total: 0 };
         productSales[item.productId].qty += item.quantity;
         productSales[item.productId].total += item.lineTotal;
@@ -61,11 +61,40 @@ export default function ReportsPage() {
   }, [filteredInvoices]);
 
   const exportCurrentReport = () => {
-    const data = paymentMethodBreakdown.map(([method, amount]) => ({
-      method: store.paymentMethods.find(p => p.id === method)?.name || method,
-      amount,
-    }));
-    downloadAsCsv(data, `report-${Date.now()}.csv`);
+    let data: Record<string, any>[] = [];
+    let filename = `report-${Date.now()}.csv`;
+
+    if (activeTab === 'financial') {
+      data = [
+        { metric: t('treasury.income'), amount: profitLoss.revenue },
+        { metric: t('treasury.expense'), amount: profitLoss.expenses },
+        { metric: t('dashboard.netProfit'), amount: profitLoss.netProfit },
+      ];
+    } else if (activeTab === 'sales') {
+      data = salesByProduct.map(([productId, d]) => {
+        const product = store.products.find(p => p.id === productId);
+        return {
+          product: product ? (language === 'ar' ? product.nameAr : product.name) : 'Unknown',
+          quantity: d.qty,
+          total: d.total,
+        };
+      });
+    } else if (activeTab === 'treasury') {
+      data = paymentMethodBreakdown.map(([method, amount]) => ({
+        method: store.paymentMethods.find(p => p.id === method)?.name || method,
+        amount,
+      }));
+    } else if (activeTab === 'inventory') {
+      data = store.products.map(p => ({
+        product: language === 'ar' ? p.nameAr : p.name,
+        sku: p.sku,
+        stock: p.stock,
+        purchasePrice: p.purchasePrice,
+        sellingPrice: p.sellingPrice,
+        totalValue: p.purchasePrice * p.stock,
+      }));
+    }
+    downloadAsCsv(data, filename);
   };
 
   return (
@@ -84,7 +113,7 @@ export default function ReportsPage() {
         </div>
       </div>
 
-      <Tabs defaultValue="financial">
+      <Tabs defaultValue="financial" value={activeTab} onValueChange={setActiveTab}>
         <TabsList>
           <TabsTrigger value="financial">{t('reports.financial')}</TabsTrigger>
           <TabsTrigger value="sales">{t('dashboard.salesByCategory')}</TabsTrigger>
@@ -104,10 +133,6 @@ export default function ReportsPage() {
                 <div className="flex justify-between border-b pb-2 dark:border-slate-700">
                   <span>{t('treasury.expense')}</span>
                   <span className="font-medium text-red-600">{formatCurrency(profitLoss.expenses, 'EGP', language)}</span>
-                </div>
-                <div className="flex justify-between border-b pb-2 dark:border-slate-700">
-                  <span>{t('invoices.grandTotal')} ({t('invoices.title')})</span>
-                  <span className="font-medium">{formatCurrency(profitLoss.invoiceTotal, 'EGP', language)}</span>
                 </div>
                 <div className="flex justify-between pt-2">
                   <span className="font-bold">{t('dashboard.netProfit')}</span>

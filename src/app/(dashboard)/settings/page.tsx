@@ -15,6 +15,9 @@ export default function SettingsPage() {
   const { language, t } = useLanguage();
   const { theme } = useTheme();
   const store = useAppStore();
+  const [newPmName, setNewPmName] = useState('');
+  const [newPmNameAr, setNewPmNameAr] = useState('');
+  const [newPmType, setNewPmType] = useState('vodafone_cash');
 
   const handleSaveSession = () => {
     const snapshot = store.getStateSnapshot();
@@ -56,7 +59,7 @@ export default function SettingsPage() {
 
   const getSetting = (key: string) => {
     const setting = store.settings.find(s => s.key === key);
-    return setting?.value || '';
+    return setting?.value ?? '';
   };
 
   const updateSetting = (key: string, value: string) => {
@@ -67,7 +70,10 @@ export default function SettingsPage() {
     <div className="space-y-6">
       <div className="page-header">
         <h1 className="page-title">{t('settings.title')}</h1>
-        <Button onClick={() => { store.updateSetting('_saved', Date.now().toString()); alert(t('settings.settingsSaved')); }}>
+        <Button onClick={() => {
+          store.updateSetting('_saved', Date.now().toString());
+          store.addNotification({ type: 'system', title: 'Settings Saved', titleAr: 'تم حفظ الإعدادات', message: 'All settings have been saved', messageAr: 'تم حفظ جميع الإعدادات', module: 'settings', recordId: '', isRead: false, readAt: null });
+        }}>
           {t('settings.saveSettings')}
         </Button>
       </div>
@@ -132,21 +138,22 @@ export default function SettingsPage() {
           <div className="border-t pt-4 dark:border-slate-700">
             <p className="text-sm font-medium mb-2">Add Custom Payment Method</p>
             <div className="grid grid-cols-3 gap-2">
-              <Input placeholder="Name (EN)" id="customNameEn" />
-              <Input placeholder="Name (AR)" id="customNameAr" />
+              <Input placeholder="Name (EN)" value={newPmName} onChange={(e) => setNewPmName(e.target.value)} />
+              <Input placeholder="Name (AR)" value={newPmNameAr} onChange={(e) => setNewPmNameAr(e.target.value)} />
               <Select options={[
                 { value: 'vodafone_cash', label: 'Vodafone Cash' },
                 { value: 'instapay', label: 'InstaPay' },
                 { value: 'cash', label: 'Cash' },
                 { value: 'bank', label: 'Bank Transfer' },
-              ]} id="customType" />
+              ]} value={newPmType} onChange={(e) => setNewPmType(e.target.value)} />
             </div>
             <Button size="sm" className="mt-2" onClick={() => {
-              const nameEn = (document.getElementById('customNameEn') as HTMLInputElement)?.value;
-              const nameAr = (document.getElementById('customNameAr') as HTMLInputElement)?.value;
-              const type = (document.getElementById('customType') as HTMLSelectElement)?.value;
-              if (nameEn && type) {
-                store.addCustomPaymentMethod({ name: nameEn, nameAr: nameAr || nameEn, type: type as any, accountHolder: '', icon: '', isActive: true, sortOrder: store.paymentMethods.length + 1 });
+              if (newPmName) {
+                store.addCustomPaymentMethod({ name: newPmName, nameAr: newPmNameAr || newPmName, type: newPmType, accountHolder: '', icon: '', isActive: true, sortOrder: store.paymentMethods.length + 1 });
+                setNewPmName('');
+                setNewPmNameAr('');
+                setNewPmType('vodafone_cash');
+                store.addNotification({ type: 'system', title: 'Payment Method Added', titleAr: 'تم إضافة طريقة الدفع', message: `${newPmName} has been added`, messageAr: `تم إضافة ${newPmNameAr || newPmName}`, module: 'settings', recordId: '', isRead: false, readAt: null });
               }
             }}>Add</Button>
           </div>

@@ -130,6 +130,8 @@ ALTER TABLE public.payment_methods ADD COLUMN IF NOT EXISTS icon text DEFAULT ''
 ALTER TABLE public.payment_methods ADD COLUMN IF NOT EXISTS is_active boolean DEFAULT true;
 ALTER TABLE public.payment_methods ADD COLUMN IF NOT EXISTS is_protected boolean DEFAULT false;
 ALTER TABLE public.payment_methods ADD COLUMN IF NOT EXISTS sort_order numeric DEFAULT 0;
+ALTER TABLE public.payment_methods ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT now();
+ALTER TABLE public.payment_methods ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
 
 -- suppliers
 ALTER TABLE public.suppliers ADD COLUMN IF NOT EXISTS name_ar text DEFAULT '';
@@ -276,6 +278,8 @@ ALTER TABLE public.audit_logs ADD COLUMN IF NOT EXISTS ip text DEFAULT '';
 -- settings
 ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS key text;
 ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS value text DEFAULT '';
+ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT now();
+ALTER TABLE public.settings ADD COLUMN IF NOT EXISTS updated_at timestamptz DEFAULT now();
 
 -- import_sessions
 ALTER TABLE public.import_sessions ADD COLUMN IF NOT EXISTS filename text DEFAULT '';
@@ -286,6 +290,7 @@ ALTER TABLE public.import_sessions ADD COLUMN IF NOT EXISTS updated_count numeri
 ALTER TABLE public.import_sessions ADD COLUMN IF NOT EXISTS skipped_count numeric DEFAULT 0;
 ALTER TABLE public.import_sessions ADD COLUMN IF NOT EXISTS error_count numeric DEFAULT 0;
 ALTER TABLE public.import_sessions ADD COLUMN IF NOT EXISTS error_report text;
+ALTER TABLE public.import_sessions ADD COLUMN IF NOT EXISTS created_at timestamptz DEFAULT now();
 
 -- discount_rules
 ALTER TABLE public.discount_rules ADD COLUMN IF NOT EXISTS name_ar text DEFAULT '';

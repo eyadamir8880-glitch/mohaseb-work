@@ -1,12 +1,11 @@
 'use client';
-import React, { useEffect, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { useLanguage } from '@/providers/language-provider';
 import { useAppStore } from '@/stores/use-app-store';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
-import { formatCurrency, formatDate, getStatusColor, formatNumber } from '@/lib/utils';
+import { formatCurrency, formatDate, getStatusColor } from '@/lib/utils';
 import { TrendingUp, TrendingDown, DollarSign, FileText, Wallet, Plus, UserPlus, Package, ArrowRightLeft, Activity } from 'lucide-react';
 import Link from 'next/link';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, PieChart, Pie, Cell, Legend } from 'recharts';
@@ -18,6 +17,7 @@ export default function DashboardPage() {
   const invoices = useAppStore((s) => s.invoices);
   const transactions = useAppStore((s) => s.treasuryTransactions);
   const products = useAppStore((s) => s.products);
+  const categories = useAppStore((s) => s.categories);
   const customers = useAppStore((s) => s.customers);
   const treasuryAccounts = useAppStore((s) => s.treasuryAccounts);
 
@@ -45,7 +45,7 @@ export default function DashboardPage() {
     return months.map((m, i) => {
       const monthTxns = transactions.filter((t) => {
         const d = new Date(t.date);
-        return d.getMonth() === i && d.getFullYear() === 2024;
+        return d.getMonth() === i && d.getFullYear() === new Date().getFullYear();
       });
       const rev = monthTxns.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0);
       const exp = monthTxns.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
@@ -56,11 +56,17 @@ export default function DashboardPage() {
   const salesByCategory = useMemo(() => {
     const byCat: Record<string, number> = {};
     invoices.forEach((inv) => {
-      const cat = getCustomerName(inv.customerId);
-      byCat[cat] = (byCat[cat] || 0) + inv.grandTotal;
+      (inv.items || []).forEach(item => {
+        const product = products.find(p => p.id === item.productId);
+        if (product) {
+          const cat = categories.find(c => c.id === product.categoryId);
+          const catName = cat ? (locale === 'ar' ? cat.nameAr : cat.name) : 'Uncategorized';
+          byCat[catName] = (byCat[catName] || 0) + item.lineTotal;
+        }
+      });
     });
-    return Object.entries(byCat).slice(0, 5).map(([name, value]) => ({ name, value }));
-  }, [invoices, customers, locale]);
+    return Object.entries(byCat).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([name, value]) => ({ name, value }));
+  }, [invoices, categories, products, locale]);
 
   const recentActivity = useMemo(() => {
     const all = [

@@ -9,7 +9,7 @@ import { Modal } from '@/components/ui/modal';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { DataTable } from '@/components/ui/data-table';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Plus } from 'lucide-react';
 
 export default function TreasuryPage() {
   const { language, t } = useLanguage();
@@ -42,8 +42,10 @@ export default function TreasuryPage() {
       return pm ? (language === 'ar' ? pm.nameAr : pm.name) : item.paymentMethod;
     }},
     { key: 'description', header: t('treasury.description'), render: (item: any) => language === 'ar' ? (item.descriptionAr || item.description) : item.description },
-    { key: 'accountId', header: t('treasury.account'), render: (item: any) => treasuryAccounts.find(a => a.id === item.accountId) ?
-      (language === 'ar' ? treasuryAccounts.find(a => a.id === item.accountId)?.nameAr : treasuryAccounts.find(a => a.id === item.accountId)?.name) : '-' },
+    { key: 'accountId', header: t('treasury.account'), render: (item: any) => {
+      const acc = treasuryAccounts.find(a => a.id === item.accountId);
+      return acc ? (language === 'ar' ? acc.nameAr : acc.name) : '-';
+    }},
   ];
 
   const handleDeleteAll = () => {
@@ -61,10 +63,8 @@ export default function TreasuryPage() {
             <Trash2 className="h-4 w-4" />
             {t('app.deleteAll')}
           </Button>
-          <Button onClick={() => setShowModal(true)}>
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-          </svg>
+          <Button onClick={() => setShowModal(true)} className="gap-2">
+          <Plus className="h-4 w-4" />
           {t('treasury.addTransaction')}
         </Button>
       </div>
@@ -120,24 +120,39 @@ export default function TreasuryPage() {
 function TransactionForm({ onSave, onCancel }: { onSave: () => void; onCancel: () => void }) {
   const { t, language } = useLanguage();
   const store = useAppStore();
+
+  // Auto-create default account if none exist
+  let accounts = store.treasuryAccounts;
+  if (accounts.length === 0) {
+    store.addTreasuryAccount({
+      name: 'Main Cash', nameAr: 'الخزينة الرئيسية', type: 'cash',
+      balance: 0, currency: 'EGP', isActive: true,
+    });
+    accounts = store.treasuryAccounts;
+  }
+
   const [type, setType] = useState<'income' | 'expense' | 'transfer'>('income');
   const [amount, setAmount] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [accountId, setAccountId] = useState(store.treasuryAccounts[0]?.id || '');
+  const [accountId, setAccountId] = useState(accounts[0]?.id || '');
   const [toAccountId, setToAccountId] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [paymentMethod, setPaymentMethod] = useState(store.paymentMethods[0]?.id || 'cash');
   const [description, setDescription] = useState('');
   const [descriptionAr, setDescriptionAr] = useState('');
 
-  const fromAccountId = accountId;
+  const numAmount = parseFloat(amount) || 0;
+  const isValid = numAmount > 0 && accountId && (type !== 'transfer' || toAccountId);
+
+  const paymentMethodName = store.paymentMethods.find(p => p.id === paymentMethod);
+  const paymentMethodDetail = paymentMethodName ? (language === 'ar' ? paymentMethodName.nameAr : paymentMethodName.name) : paymentMethod;
 
   const handleSave = () => {
-    const numAmount = parseFloat(amount) || 0;
+    if (!isValid) return;
     store.addTreasuryTransaction({
-      type, amount: numAmount, date, accountId: type === 'transfer' ? fromAccountId : accountId,
+      type, amount: numAmount, date, accountId,
       fromAccountId: type === 'transfer' ? accountId : null,
       toAccountId: type === 'transfer' ? toAccountId : null,
-      paymentMethod, paymentMethodDetail: '',
+      paymentMethod, paymentMethodDetail,
       categoryId: '', description, descriptionAr,
       referenceNumber: '', receiptUrl: '',
       linkedInvoiceId: null, linkedPOId: null, linkedReturnId: null,
@@ -145,14 +160,17 @@ function TransactionForm({ onSave, onCancel }: { onSave: () => void; onCancel: (
       isReconciled: false, reconciledAt: null,
     });
 
-    // Update account balances
     if (type === 'income') {
-      store.updateTreasuryAccount(accountId, { balance: (store.treasuryAccounts.find(a => a.id === accountId)?.balance || 0) + numAmount });
+      const acc = store.treasuryAccounts.find(a => a.id === accountId);
+      if (acc) store.updateTreasuryAccount(accountId, { balance: (acc.balance || 0) + numAmount });
     } else if (type === 'expense') {
-      store.updateTreasuryAccount(accountId, { balance: (store.treasuryAccounts.find(a => a.id === accountId)?.balance || 0) - numAmount });
+      const acc = store.treasuryAccounts.find(a => a.id === accountId);
+      if (acc) store.updateTreasuryAccount(accountId, { balance: (acc.balance || 0) - numAmount });
     } else if (type === 'transfer') {
-      store.updateTreasuryAccount(accountId, { balance: (store.treasuryAccounts.find(a => a.id === accountId)?.balance || 0) - numAmount });
-      store.updateTreasuryAccount(toAccountId, { balance: (store.treasuryAccounts.find(a => a.id === toAccountId)?.balance || 0) + numAmount });
+      const fromAcc = store.treasuryAccounts.find(a => a.id === accountId);
+      const toAcc = store.treasuryAccounts.find(a => a.id === toAccountId);
+      if (fromAcc) store.updateTreasuryAccount(accountId, { balance: (fromAcc.balance || 0) - numAmount });
+      if (toAcc) store.updateTreasuryAccount(toAccountId, { balance: (toAcc.balance || 0) + numAmount });
     }
 
     onSave();
@@ -160,7 +178,7 @@ function TransactionForm({ onSave, onCancel }: { onSave: () => void; onCancel: (
 
   return (
     <div className="space-y-4">
-      <Select label={t('app.type')} value={type} onChange={(e) => setType(e.target.value as any)}
+      <Select label={t('app.type')} value={type} onChange={(e) => setType(e.target.value as 'income' | 'expense' | 'transfer')}
         options={[
           { value: 'income', label: t('treasury.income') },
           { value: 'expense', label: t('treasury.expense') },
@@ -173,15 +191,15 @@ function TransactionForm({ onSave, onCancel }: { onSave: () => void; onCancel: (
         
         {type !== 'transfer' && (
           <Select label={t('treasury.account')} value={accountId} onChange={(e) => setAccountId(e.target.value)}
-            options={store.treasuryAccounts.map(a => ({ value: a.id, label: language === 'ar' ? a.nameAr : a.name }))} />
+            options={accounts.map(a => ({ value: a.id, label: language === 'ar' ? a.nameAr : a.name }))} />
         )}
         
         {type === 'transfer' && (
           <>
             <Select label={t('treasury.fromAccount')} value={accountId} onChange={(e) => setAccountId(e.target.value)}
-              options={store.treasuryAccounts.map(a => ({ value: a.id, label: language === 'ar' ? a.nameAr : a.name }))} />
+              options={accounts.map(a => ({ value: a.id, label: language === 'ar' ? a.nameAr : a.name }))} />
             <Select label={t('treasury.toAccount')} value={toAccountId} onChange={(e) => setToAccountId(e.target.value)}
-              options={store.treasuryAccounts.map(a => ({ value: a.id, label: language === 'ar' ? a.nameAr : a.name }))} />
+              options={accounts.map(a => ({ value: a.id, label: language === 'ar' ? a.nameAr : a.name }))} />
           </>
         )}
 
@@ -198,7 +216,7 @@ function TransactionForm({ onSave, onCancel }: { onSave: () => void; onCancel: (
 
       <div className="flex justify-end gap-2">
         <Button variant="outline" onClick={onCancel}>{t('app.cancel')}</Button>
-        <Button onClick={handleSave}>{t('app.save')}</Button>
+        <Button onClick={handleSave} disabled={!isValid}>{t('app.save')}</Button>
       </div>
     </div>
   );

@@ -82,7 +82,15 @@ export function useSupabaseRealtime() {
             try {
               const res = await apiClient.get<any[]>(module);
               if (res.data) {
-                useAppStore.setState({ [module]: res.data });
+                const currentData = useAppStore.getState() as any;
+                const localData: any[] = currentData[module] || [];
+                const localIds = new Set(localData.map((r: any) => r.id));
+                const onlyLocal = localData.filter((r: any) => !res.data.some((s: any) => s.id === r.id));
+                if (onlyLocal.length > 0) {
+                  useAppStore.setState({ [module]: [...onlyLocal, ...res.data] });
+                } else {
+                  useAppStore.setState({ [module]: res.data });
+                }
               }
             } catch (err) {
               console.error(`Realtime refetch failed for ${module}:`, err);
@@ -109,12 +117,25 @@ export function useSupabaseRealtime() {
         pollCountRef.current++;
         const isFullCycle = pollCountRef.current % 12 === 0;
 
+        const mergeWithLocal = (module: string, supabaseData: any[]) => {
+          const currentData = useAppStore.getState() as any;
+          const localData: any[] = currentData[module] || [];
+          const localIds = new Set(localData.map((r: any) => r.id));
+          const supabaseIds = new Set(supabaseData.map((r: any) => r.id));
+          const onlyLocal = localData.filter((r: any) => !supabaseIds.has(r.id));
+          if (onlyLocal.length > 0) {
+            useAppStore.setState({ [module]: [...onlyLocal, ...supabaseData] });
+          } else {
+            useAppStore.setState({ [module]: supabaseData });
+          }
+        };
+
         if (isFullCycle) {
           for (const module of POLL_MODULES) {
             try {
               const res = await apiClient.get<any[]>(module);
               if (res.data) {
-                useAppStore.setState({ [module]: res.data });
+                mergeWithLocal(module, res.data);
               }
             } catch {}
           }
@@ -131,7 +152,7 @@ export function useSupabaseRealtime() {
               if (changed) {
                 const full = await apiClient.get<any[]>(module);
                 if (full.data) {
-                  useAppStore.setState({ [module]: full.data });
+                  mergeWithLocal(module, full.data);
                 }
               }
               lastPollRef.current[module] = { id: record.id, createdAt: record.createdAt };

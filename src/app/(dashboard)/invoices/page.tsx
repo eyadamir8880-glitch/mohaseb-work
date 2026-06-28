@@ -11,7 +11,7 @@ import { Modal } from '@/components/ui/modal';
 import { formatCurrency, formatDate, getStatusColor, generateId, generateNumber } from '@/lib/utils';
 import { Plus, Search, Eye, Trash2, Wallet, Receipt, X } from 'lucide-react';
 import { PAYMENT_METHODS } from '@/lib/constants';
-import type { Invoice, InvoiceItem, Product } from '@/lib/types';
+import type { Invoice, InvoiceItem } from '@/lib/types';
 
 const statusFilters = ['all', 'draft', 'sent', 'paid', 'partially_paid', 'overdue', 'cancelled'] as const;
 
@@ -24,9 +24,11 @@ export default function InvoicesPage() {
   const [showDeleteAll, setShowDeleteAll] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showPaymentsModal, setShowPaymentsModal] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
   const [paymentAmount, setPaymentAmount] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [paymentMethod, setPaymentMethod] = useState(paymentMethods[0]?.id || PAYMENT_METHODS[0]?.id || 'cash');
+  const [paymentAccountId, setPaymentAccountId] = useState(store.treasuryAccounts[0]?.id || '');
   const [paymentRef, setPaymentRef] = useState('');
   const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0]);
   const [paymentNotes, setPaymentNotes] = useState('');
@@ -36,7 +38,7 @@ export default function InvoicesPage() {
     invoiceNumber: '',
     customerId: '',
     issueDate: new Date().toISOString().split('T')[0],
-    dueDate: '',
+    dueDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
     notes: '',
     terms: '',
     items: [] as { productId: string; productName: string; productNameAr: string; quantity: number; unitPrice: number; discountPercent: number; taxPercent: number; lineTotal: number }[],
@@ -70,6 +72,10 @@ export default function InvoicesPage() {
     setCreateForm((prev) => ({ ...prev, items: prev.items.filter((_, i) => i !== index) }));
   };
 
+  const recalcLineTotal = (item: typeof createForm.items[0]) => {
+    return (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0) * (1 - (Number(item.discountPercent) || 0) / 100);
+  };
+
   const handleItemChange = (index: number, field: string, value: string | number) => {
     setCreateForm((prev) => {
       const items = [...prev.items];
@@ -82,12 +88,7 @@ export default function InvoicesPage() {
           item.unitPrice = product.sellingPrice;
         }
       }
-      if (field === 'quantity' || field === 'unitPrice' || field === 'discountPercent') {
-        const qty = field === 'quantity' ? Number(value) : item.quantity;
-        const price = field === 'unitPrice' ? Number(value) : item.unitPrice;
-        const disc = field === 'discountPercent' ? Number(value) : item.discountPercent;
-        item.lineTotal = qty * price * (1 - disc / 100);
-      }
+      item.lineTotal = recalcLineTotal(item);
       items[index] = item;
       return { ...prev, items };
     });
@@ -157,6 +158,10 @@ export default function InvoicesPage() {
     store.deleteInvoice(id);
   };
 
+  const handleStatusChange = (id: string, newStatus: string) => {
+    store.updateInvoice(id, { status: newStatus as Invoice['status'] });
+  };
+
   const handleDeleteAll = () => {
     store.clearModuleData('invoices');
     setShowDeleteAll(false);
@@ -166,7 +171,8 @@ export default function InvoicesPage() {
     setSelectedInvoice(inv);
     const remaining = inv.grandTotal - inv.paidAmount;
     setPaymentAmount(remaining.toFixed(2));
-    setPaymentMethod('cash');
+    setPaymentMethod(paymentMethods[0]?.id || PAYMENT_METHODS[0]?.id || 'cash');
+    setPaymentAccountId(store.treasuryAccounts[0]?.id || '');
     setPaymentRef('');
     setPaymentDate(new Date().toISOString().split('T')[0]);
     setPaymentNotes('');
@@ -178,20 +184,34 @@ export default function InvoicesPage() {
     setShowPaymentsModal(true);
   };
 
+  const handleViewInvoice = (inv: Invoice) => {
+    setSelectedInvoice(inv);
+    setShowViewModal(true);
+  };
+
   const submitPayment = () => {
     if (!selectedInvoice) return;
     const amount = parseFloat(paymentAmount);
     if (!amount || amount <= 0) return;
-    recordPayment(selectedInvoice.id, {
-      invoiceId: selectedInvoice.id,
-      amount,
-      paymentMethod,
-      reference: paymentRef,
-      paidAt: new Date(paymentDate).toISOString(),
-      notes: paymentNotes,
-    });
-    setShowPaymentModal(false);
-    setSelectedInvoice(null);
+    try {
+      recordPayment(selectedInvoice.id, {
+        invoiceId: selectedInvoice.id,
+        amount,
+        paymentMethod,
+        accountId: paymentAccountId,
+        reference: paymentRef,
+        paidAt: new Date(paymentDate).toISOString(),
+        notes: paymentNotes,
+      });
+      setShowPaymentModal(false);
+      setSelectedInvoice(null);
+    } catch (err) {
+      store.addNotification({
+        type: 'system', title: 'Payment Failed', titleAr: 'فشل الدفع',
+        message: (err as Error).message, messageAr: (err as Error).message,
+        module: 'invoices', recordId: selectedInvoice.id, isRead: false, readAt: null,
+      });
+    }
   };
 
   function getPaymentMethodName(methodId: string): string {
@@ -273,6 +293,17 @@ export default function InvoicesPage() {
                         <Badge className={getStatusColor(inv.status)}>
                           {(t.invoices.statuses as any)[inv.status]}
                         </Badge>
+                        <div className="mt-1">
+                          <select
+                            className="text-[10px] border rounded px-1 py-0.5 bg-transparent"
+                            value={inv.status}
+                            onChange={(e) => handleStatusChange(inv.id, e.target.value)}
+                          >
+                            {statusFilters.map(s => (
+                              <option key={s} value={s}>{(t.invoices.statuses as any)[s] || s}</option>
+                            ))}
+                          </select>
+                        </div>
                       </td>
                       <td className="p-3">
                         <div className="flex items-center justify-center gap-1">
@@ -282,7 +313,7 @@ export default function InvoicesPage() {
                           <Button variant="ghost" size="icon" title="View Payments" onClick={() => handleViewPayments(inv)}>
                             <Receipt className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="icon"><Eye className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleViewInvoice(inv)}><Eye className="h-4 w-4" /></Button>
                           <Button variant="ghost" size="icon" onClick={() => handleDelete(inv.id)}><Trash2 className="h-4 w-4" /></Button>
                         </div>
                       </td>
@@ -413,9 +444,51 @@ export default function InvoicesPage() {
             <Input label={t('invoices.paymentModal.referenceNumber')} placeholder="e.g. check / transfer number" value={paymentRef} onChange={(e) => setPaymentRef(e.target.value)} />
             <Input label={t('invoices.paymentModal.date')} type="date" value={paymentDate} onChange={(e) => setPaymentDate(e.target.value)} />
             <Input label={t('invoices.notes')} placeholder="Optional notes" value={paymentNotes} onChange={(e) => setPaymentNotes(e.target.value)} />
+            <Select label={t('treasury.account')} value={paymentAccountId} onChange={(e) => setPaymentAccountId(e.target.value)} options={store.treasuryAccounts.map(a => ({ value: a.id, label: locale === 'ar' ? a.nameAr : a.name }))} />
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => { setShowPaymentModal(false); setSelectedInvoice(null); }}>{t('app.cancel')}</Button>
               <Button onClick={submitPayment} disabled={!paymentAmount || parseFloat(paymentAmount) <= 0}>{t('invoices.paymentModal.confirm')}</Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal isOpen={showViewModal} onClose={() => { setShowViewModal(false); setSelectedInvoice(null); }} title={t('invoices.invoiceDetails') || 'Invoice Details'} size="wide">
+        {selectedInvoice && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div><span className="text-muted-foreground">{t('invoices.invoiceNumber')}:</span> <span className="ml-2 font-medium">{selectedInvoice.invoiceNumber}</span></div>
+              <div><span className="text-muted-foreground">{t('invoices.customer')}:</span> <span className="ml-2 font-medium">{getCustomerName(selectedInvoice.customerId)}</span></div>
+              <div><span className="text-muted-foreground">{t('invoices.issueDate')}:</span> <span className="ml-2 font-medium">{formatDate(selectedInvoice.issueDate, locale)}</span></div>
+              <div><span className="text-muted-foreground">{t('invoices.dueDate')}:</span> <span className="ml-2 font-medium">{formatDate(selectedInvoice.dueDate, locale)}</span></div>
+              <div><span className="text-muted-foreground">{t('invoices.grandTotal')}:</span> <span className="ml-2 font-medium">{formatCurrency(selectedInvoice.grandTotal, 'EGP', locale)}</span></div>
+              <div><span className="text-muted-foreground">{t('invoices.status')}:</span> <Badge className={getStatusColor(selectedInvoice.status)}>{(t.invoices.statuses as any)[selectedInvoice.status]}</Badge></div>
+            </div>
+            {selectedInvoice.items && selectedInvoice.items.length > 0 && (
+              <table className="w-full text-sm">
+                <thead><tr className="border-b"><th className="text-left p-2">{t('invoices.item')}</th><th className="text-right p-2">{t('invoices.quantity')}</th><th className="text-right p-2">{t('invoices.unitPrice')}</th><th className="text-right p-2">{t('invoices.total')}</th></tr></thead>
+                <tbody>{selectedInvoice.items.map((item, i) => (
+                  <tr key={i} className="border-b"><td className="p-2">{locale === 'ar' ? item.productNameAr || item.productName : item.productName}</td><td className="p-2 text-right">{item.quantity}</td><td className="p-2 text-right">{formatCurrency(item.unitPrice, 'EGP', locale)}</td><td className="p-2 text-right">{formatCurrency(item.lineTotal, 'EGP', locale)}</td></tr>
+                ))}</tbody>
+              </table>
+            )}
+            <div className="flex items-center gap-2 pt-2">
+              <label className="text-sm font-medium">{t('app.status')}:</label>
+              <select
+                value={selectedInvoice.status}
+                onChange={(e) => {
+                  const newStatus = e.target.value;
+                  handleStatusChange(selectedInvoice.id, newStatus);
+                  setSelectedInvoice({ ...selectedInvoice, status: newStatus as any });
+                }}
+                className="text-sm border rounded px-2 py-1 bg-background"
+              >
+                {statusFilters.filter(s => s !== 'all').map(s => (
+                  <option key={s} value={s}>{(t.invoices.statuses as any)[s]}</option>
+                ))}
+              </select>
+              <div className="flex-1" />
+              <Button variant="outline" onClick={() => { setShowViewModal(false); setSelectedInvoice(null); }}>{t('app.close')}</Button>
             </div>
           </div>
         )}

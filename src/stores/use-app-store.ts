@@ -102,6 +102,7 @@ interface AppStore {
 
   addTreasuryTransaction: (transaction: Omit<TreasuryTransaction, 'id' | 'createdAt' | 'updatedAt'>) => TreasuryTransaction;
   updateTreasuryTransaction: (id: string, data: Partial<TreasuryTransaction>) => void;
+  deleteTreasuryTransaction: (id: string) => void;
 
   addWarehouse: (warehouse: Omit<Warehouse, 'id' | 'createdAt'>) => Warehouse;
   updateWarehouse: (id: string, data: Partial<Warehouse>) => void;
@@ -519,7 +520,7 @@ export const useAppStore = create<AppStore>()(
     if (items) {
       items.forEach(item => syncToSupabase('post', 'invoice-items', { ...item, invoiceId: invoice.id }));
     }
-    if (invoice.customerId) {
+    if (invoice.customerId && invoice.status !== 'draft') {
       get().addCustomerStatement({
         customerId: invoice.customerId,
         date: invoice.issueDate?.split('T')[0] || new Date().toISOString().split('T')[0],
@@ -530,6 +531,22 @@ export const useAppStore = create<AppStore>()(
         debit: invoice.grandTotal,
         credit: 0,
         balance: 0,
+      });
+    }
+    if (invoice.status !== 'draft' && invoice.items) {
+      const state = get();
+      invoice.items.forEach(item => {
+        const product = state.products.find(p => p.id === item.productId);
+        if (product && product.trackInventory) {
+          get().updateProduct(product.id, { stock: Math.max(0, product.stock - item.quantity) });
+          get().addStockMovement({
+            productId: item.productId, variantId: item.variantId, type: 'out', quantity: item.quantity,
+            reason: `Invoice ${invoice.invoiceNumber}`,
+            date: invoice.issueDate?.split('T')[0] || new Date().toISOString().split('T')[0],
+            referenceType: 'invoice', referenceId: invoice.id,
+            warehouseId: state.warehouses[0]?.id || '',
+          });
+        }
       });
     }
     return invoice;
@@ -553,6 +570,19 @@ export const useAppStore = create<AppStore>()(
           });
         }
       });
+      if (old.customerId) {
+        get().addCustomerStatement({
+          customerId: old.customerId,
+          date: old.issueDate?.split('T')[0] || new Date().toISOString().split('T')[0],
+          type: 'invoice',
+          referenceNumber: old.invoiceNumber,
+          description: `Invoice ${old.invoiceNumber}`,
+          descriptionAr: `فاتورة ${old.invoiceNumber}`,
+          debit: old.grandTotal,
+          credit: 0,
+          balance: 0,
+        });
+      }
     }
     if (wasNonDraft && newStatus === 'cancelled' && old.items) {
       const state = get();
@@ -592,6 +622,23 @@ export const useAppStore = create<AppStore>()(
         }
       });
     }
+    // Reverse related treasury transactions
+    (old?.payments || []).forEach(p => {
+      const txs = get().treasuryTransactions.filter(tx => tx.linkedInvoiceId === id);
+      txs.forEach(tx => {
+        const acc = get().treasuryAccounts.find(a => a.id === tx.accountId);
+        if (acc) {
+          get().updateTreasuryAccount(tx.accountId, { balance: Math.max(0, (acc.balance || 0) - p.amount) });
+        }
+        get().deleteTreasuryTransaction(tx.id);
+      });
+    });
+    // Remove related customer statements
+    if (old?.customerId) {
+      set((state) => ({
+        customerStatements: state.customerStatements.filter(s => s.referenceNumber !== old.invoiceNumber)
+      }));
+    }
     set((state) => ({ invoices: state.invoices.filter(i => i.id !== id) }));
     get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'deleted', module: 'invoices', recordId: id, oldValues: old, newValues: null, ip: '' });
     syncToSupabase('delete', 'invoices', { id });
@@ -605,6 +652,7 @@ export const useAppStore = create<AppStore>()(
     const newPaidAmount = invoice.paidAmount + payment.amount;
     const newStatus = newPaidAmount >= invoice.grandTotal ? 'paid' : 'partially_paid';
     const wasDraft = invoice.status === 'draft';
+    const { accountId: preferredAccountId, ...paymentData } = data as any;
     set((state) => ({
       invoices: state.invoices.map(i =>
         i.id === invoiceId
@@ -613,7 +661,7 @@ export const useAppStore = create<AppStore>()(
       ),
     }));
     get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'updated', module: 'invoices', recordId: invoiceId, oldValues: null, newValues: { paidAmount: newPaidAmount, status: newStatus }, ip: '' });
-    syncToSupabase('post', 'invoicePayments', { ...data, invoiceId, id: payment.id, createdAt: payment.createdAt });
+    syncToSupabase('post', 'invoicePayments', { ...paymentData, invoiceId, id: payment.id, createdAt: payment.createdAt });
     syncToSupabase('put', 'invoices', { id: invoiceId, paidAmount: newPaidAmount, status: newStatus });
 
     if (wasDraft && invoice.items) {
@@ -632,12 +680,21 @@ export const useAppStore = create<AppStore>()(
       });
     }
 
-    const accountId = state.treasuryAccounts[0]?.id || '';
-    get().addTreasuryTransaction({
+    let treasuryAccounts = state.treasuryAccounts;
+    if (treasuryAccounts.length === 0) {
+      get().addTreasuryAccount({
+        name: 'Main Cash', nameAr: 'الخزينة الرئيسية', type: 'cash',
+        balance: 0, currency: 'EGP', isActive: true,
+      });
+      treasuryAccounts = get().treasuryAccounts;
+    }
+    const accountId = preferredAccountId || treasuryAccounts[0]?.id || '';
+    const paymentMethodName = [...state.paymentMethods, ...PAYMENT_METHODS].find(p => p.id === data.paymentMethod);
+    const tx = get().addTreasuryTransaction({
       type: 'income', amount: payment.amount, date: data.paidAt?.split('T')[0] || new Date().toISOString().split('T')[0],
       accountId,
       fromAccountId: null, toAccountId: null,
-      paymentMethod: data.paymentMethod, paymentMethodDetail: data.paymentMethod,
+      paymentMethod: data.paymentMethod, paymentMethodDetail: paymentMethodName ? (paymentMethodName.nameAr || paymentMethodName.name) : data.paymentMethod,
       categoryId: '', description: `Payment for ${invoice.invoiceNumber}`,
       descriptionAr: `دفعة للفاتورة ${invoice.invoiceNumber}`,
       referenceNumber: data.reference || '', receiptUrl: '',
@@ -645,8 +702,13 @@ export const useAppStore = create<AppStore>()(
       isRecurring: false, recurringPattern: null, nextOccurrence: null,
       isReconciled: false, reconciledAt: null,
     });
+    set((state) => ({
+      invoices: state.invoices.map(i =>
+        i.id === invoiceId ? { ...i, treasuryTransactionId: tx.id } : i
+      ),
+    }));
     if (accountId) {
-      const account = state.treasuryAccounts.find(a => a.id === accountId);
+      const account = treasuryAccounts.find(a => a.id === accountId);
       if (account) {
         get().updateTreasuryAccount(accountId, { balance: (account.balance || 0) + payment.amount });
       }
@@ -775,15 +837,24 @@ export const useAppStore = create<AppStore>()(
 
     if (ret.refundAmount > 0) {
       const state = get();
-      const accountId = state.treasuryAccounts[0]?.id || '';
+      let treasuryAccounts = state.treasuryAccounts;
+      if (treasuryAccounts.length === 0) {
+        get().addTreasuryAccount({
+          name: 'Main Cash', nameAr: 'الخزينة الرئيسية', type: 'cash',
+          balance: 0, currency: 'EGP', isActive: true,
+        });
+        treasuryAccounts = get().treasuryAccounts;
+      }
+      const accountId = treasuryAccounts[0]?.id || '';
+      const refundMethodName = [...get().paymentMethods, ...PAYMENT_METHODS].find(p => p.id === ret.refundMethod);
       get().addTreasuryTransaction({
         type: 'expense', amount: ret.refundAmount, date: new Date().toISOString().split('T')[0],
         accountId,
         fromAccountId: null, toAccountId: null,
-        paymentMethod: ret.refundMethod, paymentMethodDetail: ret.refundMethod,
+        paymentMethod: ret.refundMethod, paymentMethodDetail: refundMethodName ? (refundMethodName.nameAr || refundMethodName.name) : ret.refundMethod,
         categoryId: '', description: `Refund for ${ret.returnNumber}`,
         descriptionAr: `مرتجعات ${ret.returnNumber}`,
-        referenceNumber: '', receiptUrl: '',
+        referenceNumber: ret.returnNumber, receiptUrl: '',
         linkedInvoiceId: ret.type === 'customer' ? ret.originalInvoiceId : null,
         linkedPOId: ret.type === 'supplier' ? ret.originalPOId : null,
         linkedReturnId: ret.id,
@@ -791,7 +862,7 @@ export const useAppStore = create<AppStore>()(
         isReconciled: false, reconciledAt: null,
       });
       if (accountId) {
-        const account = state.treasuryAccounts.find(a => a.id === accountId);
+        const account = treasuryAccounts.find(a => a.id === accountId);
         if (account) {
           get().updateTreasuryAccount(accountId, { balance: (account.balance || 0) - ret.refundAmount });
         }
@@ -829,6 +900,10 @@ export const useAppStore = create<AppStore>()(
   updateTreasuryTransaction: (id, data) => {
     set((state) => ({ treasuryTransactions: state.treasuryTransactions.map(t => t.id === id ? { ...t, ...data, updatedAt: new Date().toISOString() } : t) }));
     syncToSupabase('put', 'treasuryTransactions', { id, ...data });
+  },
+  deleteTreasuryTransaction: (id) => {
+    set((state) => ({ treasuryTransactions: state.treasuryTransactions.filter(t => t.id !== id) }));
+    syncToSupabase('delete', 'treasuryTransactions', { id });
   },
 
   addWarehouse: (data) => {
@@ -964,6 +1039,24 @@ export const useAppStore = create<AppStore>()(
 
   clearModuleData: (module) => {
     const oldData = [...(get() as any)[module]];
+    // Cascade cleanup for invoices
+    if (module === 'invoices') {
+      const invoiceIds = oldData.map((i: any) => i.id);
+      const invoiceNumbers = oldData.map((i: any) => i.invoiceNumber);
+      // Delete linked treasury transactions
+      const linkedTxs = get().treasuryTransactions.filter(tx => invoiceIds.includes(tx.linkedInvoiceId));
+      linkedTxs.forEach(tx => {
+        get().deleteTreasuryTransaction(tx.id);
+      });
+      // Reset all treasury account balances
+      get().treasuryAccounts.forEach(acc => {
+        get().updateTreasuryAccount(acc.id, { balance: 0 });
+      });
+      // Delete related customer statements
+      set((state) => ({
+        customerStatements: state.customerStatements.filter(s => !invoiceNumbers.includes(s.referenceNumber))
+      }));
+    }
     set({ [module]: [] } as any);
     get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'deleted', module, recordId: 'all', oldValues: null, newValues: null, ip: '' });
     if (isSupabaseConfigured) {
@@ -1045,7 +1138,13 @@ export const useAppStore = create<AppStore>()(
   merge: (persisted: any, current: any) => {
     const hasAnyData = persisted && Object.values(persisted).some((v: any) => Array.isArray(v) && v.length > 0);
     if (hasAnyData) {
-      return { ...current, ...persisted, isInitialized: isSupabaseConfigured ? false : true };
+      const merged = { ...current, ...persisted, isInitialized: isSupabaseConfigured ? false : true };
+      for (const key of Object.keys(current)) {
+        if (Array.isArray(current[key]) && !Array.isArray(merged[key])) {
+          merged[key] = [];
+        }
+      }
+      return merged;
     }
     return current;
   },

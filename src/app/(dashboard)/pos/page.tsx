@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { formatCurrency, generateId } from '@/lib/utils';
 import { Search, Plus, Minus, Trash2, ShoppingCart, X, Printer, Check, CreditCard, Wallet, Smartphone } from 'lucide-react';
 import { PAYMENT_METHODS } from '@/lib/constants';
-import type { Product, TreasuryAccount, InvoiceItem } from '@/lib/types';
+import type { Product, InvoiceItem } from '@/lib/types';
 
 type CartItem = {
   productId: string;
@@ -122,11 +122,6 @@ export default function POSPage() {
     setSelectedPayment('cash');
   };
 
-  const getLowStock = (p: Product) => {
-    if (!p.trackInventory) return false;
-    return p.stock <= p.lowStockThreshold;
-  };
-
   const getOutOfStock = (p: Product) => {
     return p.trackInventory && p.stock <= 0;
   };
@@ -137,8 +132,15 @@ export default function POSPage() {
   };
 
   const getDefaultAccount = (): string => {
-    const defaultAcc = treasuryAccounts.find((a) => a.isDefault);
-    return defaultAcc?.id || treasuryAccounts[0]?.id || '';
+    const accounts = useAppStore.getState().treasuryAccounts;
+    const defaultAcc = accounts.find((a) => a.isDefault);
+    if (defaultAcc) return defaultAcc.id;
+    if (accounts.length > 0) return accounts[0].id;
+    const newAcc = useAppStore.getState().addTreasuryAccount({
+      name: 'Main Cash', nameAr: 'النقدية الرئيسية',
+      type: 'cash', balance: 0, currency: 'EGP', isDefault: true,
+    });
+    return newAcc.id;
   };
 
   const handleCheckout = () => {
@@ -264,10 +266,6 @@ export default function POSPage() {
       ['cash', 'vodafone_cash', 'instapay', 'card'].includes(pm.type) && pm.isActive
     );
   }, []);
-
-  const incomeCats = useMemo(() => {
-    return categories.filter((c) => c.type === 'income');
-  }, [categories]);
 
   return (
     <div className="h-[calc(100vh-4rem)] flex flex-col print:h-auto">
