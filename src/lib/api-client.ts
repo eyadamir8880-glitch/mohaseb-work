@@ -35,7 +35,7 @@ function camelToSnake(obj: any): any {
     const result: Record<string, any> = {};
     for (const [key, value] of Object.entries(obj)) {
       if (key.endsWith('Id') && value === '') continue;
-      const snakeKey = key.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
+      const snakeKey = key.replace(/([a-z0-9])([A-Z])/g, '$1_$2').replace(/([A-Z]+)([A-Z][a-z])/g, '$1_$2').toLowerCase();
       result[snakeKey] = camelToSnake(value);
     }
     return result;
@@ -214,13 +214,12 @@ export const apiClient = {
           return responseInterceptor({ data: data as any, status: 201, message: 'Created successfully' });
         }
         const snakeData = camelToSnake(data);
-        if (table === 'treasury_transactions') console.log('POST treasury_transactions data:', JSON.stringify(snakeData));
         const { data: inserted, error } = await (getSupabase() as any)
           .from(table)
           .upsert(snakeData, { onConflict: 'id', ignoreDuplicates: false })
           .select()
           .single();
-        if (error) { console.error(`Supabase 400 on ${table}: ${error.message}`); throw { code: 'SUPABASE_ERROR', message: error.message }; }
+        if (error) throw { code: 'SUPABASE_ERROR', message: error.message };
 
         await (getSupabase() as any).from('audit_logs').insert({
           timestamp: new Date().toISOString(),
