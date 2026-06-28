@@ -212,12 +212,14 @@ export const apiClient = {
         if (!table || endpoint.includes('dashboard')) {
           return responseInterceptor({ data: data as any, status: 201, message: 'Created successfully' });
         }
+        const snakeData = camelToSnake(data);
+        console.debug(`POST ${table}:`, JSON.stringify(snakeData).slice(0, 500));
         const { data: inserted, error } = await (getSupabase() as any)
           .from(table)
-          .upsert(camelToSnake(data), { onConflict: 'id', ignoreDuplicates: false })
+          .upsert(snakeData, { onConflict: 'id', ignoreDuplicates: false })
           .select()
           .single();
-        if (error) throw { code: 'SUPABASE_ERROR', message: error.message };
+        if (error) { console.error(`Supabase 400 on ${table}:`, JSON.stringify(snakeData).slice(0, 500), error.message); throw { code: 'SUPABASE_ERROR', message: error.message }; }
 
         await (getSupabase() as any).from('audit_logs').insert({
           timestamp: new Date().toISOString(),
