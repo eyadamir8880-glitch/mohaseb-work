@@ -130,8 +130,13 @@ function SupplierForm({ supplierId, onSave, onCancel }: { supplierId: string | n
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
-        <Input label={t('suppliers.name') + ' (EN)'} value={name} onChange={(e) => setName(e.target.value)} />
-        <Input label={t('suppliers.name') + ' (AR)'} value={nameAr} onChange={(e) => setNameAr(e.target.value)} />
+        <div className="col-span-2">
+          <label className="label">{t('suppliers.name')}</label>
+          <div className="flex gap-2">
+            <Input placeholder="English" value={name} onChange={(e) => setName(e.target.value)} />
+            <Input placeholder="العربية" value={nameAr} onChange={(e) => setNameAr(e.target.value)} />
+          </div>
+        </div>
         <Input label={t('suppliers.phone')} value={phone} onChange={(e) => setPhone(e.target.value)} />
         <Input label={t('suppliers.email')} type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
         <Input label={t('suppliers.address')} value={address} onChange={(e) => setAddress(e.target.value)} />

@@ -175,8 +175,13 @@ function AssetForm({ assetId, onSave, onCancel }: { assetId: string | null; onSa
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
-        <Input label={t('assets.name') + ' (EN)'} value={name} onChange={(e) => setName(e.target.value)} />
-        <Input label={t('assets.name') + ' (AR)'} value={nameAr} onChange={(e) => setNameAr(e.target.value)} />
+        <div className="col-span-2">
+          <label className="label">{t('assets.name')}</label>
+          <div className="flex gap-2">
+            <Input placeholder="English" value={name} onChange={(e) => setName(e.target.value)} />
+            <Input placeholder="العربية" value={nameAr} onChange={(e) => setNameAr(e.target.value)} />
+          </div>
+        </div>
         <Select label={t('assets.category')} value={category} onChange={(e) => setCategory(e.target.value)}
           options={ASSET_CATEGORIES.map(c => ({ value: c.value, label: language === 'ar' ? c.labelAr : c.label }))} />
         <Input label={t('assets.purchaseDate')} type="date" value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} />

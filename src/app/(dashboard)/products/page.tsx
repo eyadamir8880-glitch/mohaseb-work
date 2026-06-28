@@ -335,11 +335,10 @@ export default function ProductsPage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="col-span-2">
                 <label className="label">{t('products.name')}</label>
-                <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-              </div>
-              <div className="col-span-2">
-                <label className="label">{t('products.name')} (AR)</label>
-                <Input value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} />
+                <div className="flex gap-2">
+                  <Input placeholder="English" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+                  <Input placeholder="العربية" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} />
+                </div>
               </div>
               <div>
                 <label className="label">SKU</label>

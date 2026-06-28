@@ -176,10 +176,20 @@ function EmployeeForm({ employeeId, onSave, onCancel }: { employeeId: string | n
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
-        <Input label={t('employees.name') + ' (EN)'} value={name} onChange={(e) => setName(e.target.value)} />
-        <Input label={t('employees.name') + ' (AR)'} value={nameAr} onChange={(e) => setNameAr(e.target.value)} />
-        <Input label={t('employees.position') + ' (EN)'} value={position} onChange={(e) => setPosition(e.target.value)} />
-        <Input label={t('employees.position') + ' (AR)'} value={positionAr} onChange={(e) => setPositionAr(e.target.value)} />
+        <div className="col-span-2">
+          <label className="label">{t('employees.name')}</label>
+          <div className="flex gap-2">
+            <Input placeholder="English" value={name} onChange={(e) => setName(e.target.value)} />
+            <Input placeholder="العربية" value={nameAr} onChange={(e) => setNameAr(e.target.value)} />
+          </div>
+        </div>
+        <div className="col-span-2">
+          <label className="label">{t('employees.position')}</label>
+          <div className="flex gap-2">
+            <Input placeholder="English" value={position} onChange={(e) => setPosition(e.target.value)} />
+            <Input placeholder="العربية" value={positionAr} onChange={(e) => setPositionAr(e.target.value)} />
+          </div>
+        </div>
         <Input label={t('employees.phone')} value={phone} onChange={(e) => setPhone(e.target.value)} />
         <Input label={t('employees.email')} type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
         <Input label={t('customers.address')} value={address} onChange={(e) => setAddress(e.target.value)} />

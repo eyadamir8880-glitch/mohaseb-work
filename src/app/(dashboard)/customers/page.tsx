@@ -134,8 +134,13 @@ function CustomerForm({ customerId, onSave, onCancel }: { customerId: string | n
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
-        <Input label={t('customers.name') + ' (EN)'} value={name} onChange={(e) => setName(e.target.value)} />
-        <Input label={t('customers.name') + ' (AR)'} value={nameAr} onChange={(e) => setNameAr(e.target.value)} />
+        <div className="col-span-2">
+          <label className="label">{t('customers.name')}</label>
+          <div className="flex gap-2">
+            <Input placeholder="English" value={name} onChange={(e) => setName(e.target.value)} />
+            <Input placeholder="العربية" value={nameAr} onChange={(e) => setNameAr(e.target.value)} />
+          </div>
+        </div>
         <Input label={t('customers.phone')} value={phone} onChange={(e) => setPhone(e.target.value)} />
         <Input label={t('customers.email')} type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
         <Input label={t('customers.address')} value={address} onChange={(e) => setAddress(e.target.value)} />

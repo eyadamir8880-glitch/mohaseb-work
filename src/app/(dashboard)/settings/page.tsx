@@ -89,8 +89,13 @@ export default function SettingsPage() {
 
         <TabsContent value="company" className="mt-4 space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <Input label="Company Name (EN)" value={getSetting('companyName')} onChange={(e) => updateSetting('companyName', e.target.value)} />
-            <Input label="Company Name (AR)" value={getSetting('companyNameAr')} onChange={(e) => updateSetting('companyNameAr', e.target.value)} />
+            <div className="col-span-2">
+              <label className="label">Company Name</label>
+              <div className="flex gap-2">
+                <Input placeholder="English" value={getSetting('companyName')} onChange={(e) => updateSetting('companyName', e.target.value)} />
+                <Input placeholder="العربية" value={getSetting('companyNameAr')} onChange={(e) => updateSetting('companyNameAr', e.target.value)} />
+              </div>
+            </div>
             <Input label="Phone" value={getSetting('companyPhone')} onChange={(e) => updateSetting('companyPhone', e.target.value)} />
             <Input label="Email" value={getSetting('companyEmail')} onChange={(e) => updateSetting('companyEmail', e.target.value)} />
             <Input label="Address (EN)" value={getSetting('companyAddress')} onChange={(e) => updateSetting('companyAddress', e.target.value)} />
@@ -138,8 +143,13 @@ export default function SettingsPage() {
           <div className="border-t pt-4 dark:border-slate-700">
             <p className="text-sm font-medium mb-2">Add Custom Payment Method</p>
             <div className="grid grid-cols-3 gap-2">
-              <Input placeholder="Name (EN)" value={newPmName} onChange={(e) => setNewPmName(e.target.value)} />
-              <Input placeholder="Name (AR)" value={newPmNameAr} onChange={(e) => setNewPmNameAr(e.target.value)} />
+              <div className="col-span-2">
+                <label className="label">Name</label>
+                <div className="flex gap-2">
+                  <Input placeholder="English" value={newPmName} onChange={(e) => setNewPmName(e.target.value)} />
+                  <Input placeholder="العربية" value={newPmNameAr} onChange={(e) => setNewPmNameAr(e.target.value)} />
+                </div>
+              </div>
               <Select options={[
                 { value: 'vodafone_cash', label: 'Vodafone Cash' },
                 { value: 'instapay', label: 'InstaPay' },
