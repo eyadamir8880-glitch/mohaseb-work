@@ -17,7 +17,7 @@ export default function SettingsPage() {
   const store = useAppStore();
   const [newPmName, setNewPmName] = useState('');
   const [newPmNameAr, setNewPmNameAr] = useState('');
-  const [newPmType, setNewPmType] = useState('vodafone_cash');
+  const [newPmType, setNewPmType] = useState<'vodafone_cash' | 'instapay' | 'cash' | 'bank' | 'card' | 'check'>('vodafone_cash');
 
   const handleSaveSession = () => {
     const snapshot = store.getStateSnapshot();
@@ -145,7 +145,7 @@ export default function SettingsPage() {
                 { value: 'instapay', label: 'InstaPay' },
                 { value: 'cash', label: 'Cash' },
                 { value: 'bank', label: 'Bank Transfer' },
-              ]} value={newPmType} onChange={(e) => setNewPmType(e.target.value)} />
+              ]} value={newPmType} onChange={(e) => setNewPmType(e.target.value as typeof newPmType)} />
             </div>
             <Button size="sm" className="mt-2" onClick={() => {
               if (newPmName) {
