@@ -35,7 +35,7 @@ function camelToSnake(obj: any): any {
     const result: Record<string, any> = {};
     for (const [key, value] of Object.entries(obj)) {
       const snakeKey = key.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
-      result[snakeKey] = camelToSnake(value);
+      result[snakeKey] = (snakeKey.endsWith('_id') && value === '') ? null : camelToSnake(value);
     }
     return result;
   }
