@@ -111,12 +111,11 @@ function CategoryForm({ categoryId, defaultType, onSave, onCancel }: { categoryI
   const store = useAppStore();
   const existing = categoryId ? store.categories.find(c => c.id === categoryId) : null;
   const [name, setName] = useState(existing?.name || '');
-  const [nameAr, setNameAr] = useState(existing?.nameAr || '');
   const [type, setType] = useState(existing?.type || defaultType);
   const [parentId, setParentId] = useState(existing?.parentId || '');
 
   const handleSave = () => {
-    const data = { name, nameAr, type: type as any, parentId: parentId || null, description: '', sortOrder: 0 };
+    const data = { name, nameAr: name, type: type as any, parentId: parentId || null, description: '', sortOrder: 0 };
     if (existing) {
       store.updateCategory(existing.id, data);
     } else {
@@ -128,13 +127,7 @@ function CategoryForm({ categoryId, defaultType, onSave, onCancel }: { categoryI
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
-        <div className="col-span-2">
-          <label className="label">{t('categories.name')}</label>
-          <div className="flex gap-2">
-            <Input placeholder="English" value={name} onChange={(e) => setName(e.target.value)} />
-            <Input placeholder="العربية" value={nameAr} onChange={(e) => setNameAr(e.target.value)} />
-          </div>
-        </div>
+        <Input label={t('categories.name')} value={name} onChange={(e) => setName(e.target.value)} />
         <Select label={t('categories.type')} value={type} onChange={(e) => setType(e.target.value)}
           options={[
             { value: 'product', label: t('categories.product') },

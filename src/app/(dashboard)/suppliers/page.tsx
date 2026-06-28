@@ -109,7 +109,6 @@ function SupplierForm({ supplierId, onSave, onCancel }: { supplierId: string | n
   const store = useAppStore();
   const existing = supplierId ? store.suppliers.find(s => s.id === supplierId) : null;
   const [name, setName] = useState(existing?.name || '');
-  const [nameAr, setNameAr] = useState(existing?.nameAr || '');
   const [phone, setPhone] = useState(existing?.phone || '');
   const [email, setEmail] = useState(existing?.email || '');
   const [address, setAddress] = useState(existing?.address || '');
@@ -118,7 +117,7 @@ function SupplierForm({ supplierId, onSave, onCancel }: { supplierId: string | n
   const [notes, setNotes] = useState(existing?.notes || '');
 
   const handleSave = () => {
-    const data = { name, nameAr, phone, email, address, taxNumber, paymentTerms: parseInt(paymentTerms), notes, totalPOs: existing?.totalPOs || 0, totalPaid: existing?.totalPaid || 0, balanceDue: existing?.balanceDue || 0 };
+    const data = { name, nameAr: name, phone, email, address, taxNumber, paymentTerms: parseInt(paymentTerms), notes, totalPOs: existing?.totalPOs || 0, totalPaid: existing?.totalPaid || 0, balanceDue: existing?.balanceDue || 0 };
     if (existing) {
       store.updateSupplier(existing.id, data);
     } else {
@@ -130,13 +129,7 @@ function SupplierForm({ supplierId, onSave, onCancel }: { supplierId: string | n
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
-        <div className="col-span-2">
-          <label className="label">{t('suppliers.name')}</label>
-          <div className="flex gap-2">
-            <Input placeholder="English" value={name} onChange={(e) => setName(e.target.value)} />
-            <Input placeholder="العربية" value={nameAr} onChange={(e) => setNameAr(e.target.value)} />
-          </div>
-        </div>
+        <Input label={t('suppliers.name')} value={name} onChange={(e) => setName(e.target.value)} />
         <Input label={t('suppliers.phone')} value={phone} onChange={(e) => setPhone(e.target.value)} />
         <Input label={t('suppliers.email')} type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
         <Input label={t('suppliers.address')} value={address} onChange={(e) => setAddress(e.target.value)} />

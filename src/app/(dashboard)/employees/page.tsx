@@ -148,9 +148,7 @@ function EmployeeForm({ employeeId, onSave, onCancel }: { employeeId: string | n
   const store = useAppStore();
   const existing = employeeId ? store.employees.find(e => e.id === employeeId) : null;
   const [name, setName] = useState(existing?.name || '');
-  const [nameAr, setNameAr] = useState(existing?.nameAr || '');
   const [position, setPosition] = useState(existing?.position || '');
-  const [positionAr, setPositionAr] = useState(existing?.positionAr || '');
   const [phone, setPhone] = useState(existing?.phone || '');
   const [email, setEmail] = useState(existing?.email || '');
   const [address, setAddress] = useState(existing?.address || '');
@@ -164,7 +162,7 @@ function EmployeeForm({ employeeId, onSave, onCancel }: { employeeId: string | n
   const netSalary = parseFloat(baseSalary) + parseFloat(allowances) - parseFloat(deductions);
 
   const handleSave = () => {
-    const data = { name, nameAr, position, positionAr, phone, email, address, joinDate, baseSalary: parseFloat(baseSalary), allowances: parseFloat(allowances), deductions: parseFloat(deductions), netSalary, status: status as any, notes };
+    const data = { name, nameAr: name, position, positionAr: position, phone, email, address, joinDate, baseSalary: parseFloat(baseSalary), allowances: parseFloat(allowances), deductions: parseFloat(deductions), netSalary, status: status as any, notes };
     if (existing) {
       store.updateEmployee(existing.id, data);
     } else {
@@ -176,20 +174,8 @@ function EmployeeForm({ employeeId, onSave, onCancel }: { employeeId: string | n
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
-        <div className="col-span-2">
-          <label className="label">{t('employees.name')}</label>
-          <div className="flex gap-2">
-            <Input placeholder="English" value={name} onChange={(e) => setName(e.target.value)} />
-            <Input placeholder="العربية" value={nameAr} onChange={(e) => setNameAr(e.target.value)} />
-          </div>
-        </div>
-        <div className="col-span-2">
-          <label className="label">{t('employees.position')}</label>
-          <div className="flex gap-2">
-            <Input placeholder="English" value={position} onChange={(e) => setPosition(e.target.value)} />
-            <Input placeholder="العربية" value={positionAr} onChange={(e) => setPositionAr(e.target.value)} />
-          </div>
-        </div>
+        <Input label={t('employees.name')} value={name} onChange={(e) => setName(e.target.value)} />
+        <Input label={t('employees.position')} value={position} onChange={(e) => setPosition(e.target.value)} />
         <Input label={t('employees.phone')} value={phone} onChange={(e) => setPhone(e.target.value)} />
         <Input label={t('employees.email')} type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
         <Input label={t('customers.address')} value={address} onChange={(e) => setAddress(e.target.value)} />

@@ -114,7 +114,6 @@ function CustomerForm({ customerId, onSave, onCancel }: { customerId: string | n
   const store = useAppStore();
   const existing = customerId ? store.customers.find(c => c.id === customerId) : null;
   const [name, setName] = useState(existing?.name || '');
-  const [nameAr, setNameAr] = useState(existing?.nameAr || '');
   const [phone, setPhone] = useState(existing?.phone || '');
   const [email, setEmail] = useState(existing?.email || '');
   const [address, setAddress] = useState(existing?.address || '');
@@ -122,7 +121,7 @@ function CustomerForm({ customerId, onSave, onCancel }: { customerId: string | n
   const [creditLimit, setCreditLimit] = useState(String(existing?.creditLimit || 0));
 
   const handleSave = () => {
-    const data = { name, nameAr, phone, email, address, taxNumber, creditLimit: parseFloat(creditLimit), totalInvoiced: existing?.totalInvoiced || 0, totalPaid: existing?.totalPaid || 0, totalDue: existing?.totalDue || 0, customPricingRules: existing?.customPricingRules || [] };
+    const data = { name, nameAr: name, phone, email, address, taxNumber, creditLimit: parseFloat(creditLimit), totalInvoiced: existing?.totalInvoiced || 0, totalPaid: existing?.totalPaid || 0, totalDue: existing?.totalDue || 0, customPricingRules: existing?.customPricingRules || [] };
     if (existing) {
       store.updateCustomer(existing.id, data);
     } else {
@@ -134,13 +133,7 @@ function CustomerForm({ customerId, onSave, onCancel }: { customerId: string | n
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
-        <div className="col-span-2">
-          <label className="label">{t('customers.name')}</label>
-          <div className="flex gap-2">
-            <Input placeholder="English" value={name} onChange={(e) => setName(e.target.value)} />
-            <Input placeholder="العربية" value={nameAr} onChange={(e) => setNameAr(e.target.value)} />
-          </div>
-        </div>
+        <Input label={t('customers.name')} value={name} onChange={(e) => setName(e.target.value)} />
         <Input label={t('customers.phone')} value={phone} onChange={(e) => setPhone(e.target.value)} />
         <Input label={t('customers.email')} type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
         <Input label={t('customers.address')} value={address} onChange={(e) => setAddress(e.target.value)} />

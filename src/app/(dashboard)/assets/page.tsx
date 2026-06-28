@@ -143,7 +143,6 @@ function AssetForm({ assetId, onSave, onCancel }: { assetId: string | null; onSa
   const store = useAppStore();
   const existing = assetId ? store.assets.find(a => a.id === assetId) : null;
   const [name, setName] = useState(existing?.name || '');
-  const [nameAr, setNameAr] = useState(existing?.nameAr || '');
   const [category, setCategory] = useState(existing?.category || 'equipment');
   const [purchaseDate, setPurchaseDate] = useState(existing?.purchaseDate || new Date().toISOString().split('T')[0]);
   const [purchaseCost, setPurchaseCost] = useState(String(existing?.purchaseCost || 0));
@@ -159,7 +158,7 @@ function AssetForm({ assetId, onSave, onCancel }: { assetId: string | null; onSa
 
   const handleSave = () => {
     const data = {
-      name, nameAr, category, purchaseDate, purchaseCost: cost,
+      name, nameAr: name, category, purchaseDate, purchaseCost: cost,
       salvageValue: salvage, usefulLife: life, depreciationMethod: depreciationMethod as any,
       currentBookValue, status: 'active' as const,
       disposalDate: null, disposalPrice: null, depreciationRecords: [],
@@ -175,13 +174,7 @@ function AssetForm({ assetId, onSave, onCancel }: { assetId: string | null; onSa
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
-        <div className="col-span-2">
-          <label className="label">{t('assets.name')}</label>
-          <div className="flex gap-2">
-            <Input placeholder="English" value={name} onChange={(e) => setName(e.target.value)} />
-            <Input placeholder="العربية" value={nameAr} onChange={(e) => setNameAr(e.target.value)} />
-          </div>
-        </div>
+        <Input label={t('assets.name')} value={name} onChange={(e) => setName(e.target.value)} />
         <Select label={t('assets.category')} value={category} onChange={(e) => setCategory(e.target.value)}
           options={ASSET_CATEGORIES.map(c => ({ value: c.value, label: language === 'ar' ? c.labelAr : c.label }))} />
         <Input label={t('assets.purchaseDate')} type="date" value={purchaseDate} onChange={(e) => setPurchaseDate(e.target.value)} />

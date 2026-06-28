@@ -30,7 +30,7 @@ export default function ProductsPage() {
   }[]>([]);
   const [importResult, setImportResult] = useState<{ imported: number; skipped: number; errors: string[] } | null>(null);
   const [form, setForm] = useState({
-    name: '', nameAr: '', sku: '', barcode: '', description: '',
+    name: '', sku: '', barcode: '', description: '',
     categoryId: '', purchasePrice: 0, sellingPrice: 0, stock: 0,
     trackInventory: true, lowStockThreshold: 0, unitOfMeasure: 'piece',
   });
@@ -45,7 +45,7 @@ export default function ProductsPage() {
   }, [products, search, catFilter]);
 
   const resetForm = () => setForm({
-    name: '', nameAr: '', sku: '', barcode: '', description: '',
+    name: '', sku: '', barcode: '', description: '',
     categoryId: '', purchasePrice: 0, sellingPrice: 0, stock: 0,
     trackInventory: true, lowStockThreshold: 0, unitOfMeasure: 'piece',
   });
@@ -63,7 +63,6 @@ export default function ProductsPage() {
   const openEdit = (p: Product) => {
     setForm({
       name: p.name,
-      nameAr: p.nameAr || '',
       sku: p.sku,
       barcode: p.barcode,
       description: p.description,
@@ -83,7 +82,7 @@ export default function ProductsPage() {
     if (!form.name || !form.sku) return;
     if (editingId) {
       store.updateProduct(editingId, {
-        name: form.name, nameAr: form.nameAr, sku: form.sku, barcode: form.barcode,
+        name: form.name, nameAr: form.name, sku: form.sku, barcode: form.barcode,
         description: form.description, categoryId: form.categoryId,
         purchasePrice: form.purchasePrice, sellingPrice: form.sellingPrice,
         trackInventory: form.trackInventory,
@@ -92,7 +91,7 @@ export default function ProductsPage() {
       });
     } else {
       store.addProduct({
-        name: form.name, nameAr: form.nameAr, sku: form.sku, barcode: form.barcode,
+        name: form.name, nameAr: form.name, sku: form.sku, barcode: form.barcode,
         description: form.description, descriptionAr: '',
         categoryId: form.categoryId,
         purchasePrice: form.purchasePrice, sellingPrice: form.sellingPrice,
@@ -333,13 +332,7 @@ export default function ProductsPage() {
               </button>
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div className="col-span-2">
-                <label className="label">{t('products.name')}</label>
-                <div className="flex gap-2">
-                  <Input placeholder="English" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-                  <Input placeholder="العربية" value={form.nameAr} onChange={(e) => setForm({ ...form, nameAr: e.target.value })} />
-                </div>
-              </div>
+              <Input label={t('products.name')} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
               <div>
                 <label className="label">SKU</label>
                 <Input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} />

@@ -16,7 +16,6 @@ export default function SettingsPage() {
   const { theme } = useTheme();
   const store = useAppStore();
   const [newPmName, setNewPmName] = useState('');
-  const [newPmNameAr, setNewPmNameAr] = useState('');
   const [newPmType, setNewPmType] = useState<'vodafone_cash' | 'instapay' | 'cash' | 'bank' | 'card' | 'check'>('vodafone_cash');
 
   const handleSaveSession = () => {
@@ -89,13 +88,7 @@ export default function SettingsPage() {
 
         <TabsContent value="company" className="mt-4 space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2">
-              <label className="label">Company Name</label>
-              <div className="flex gap-2">
-                <Input placeholder="English" value={getSetting('companyName')} onChange={(e) => updateSetting('companyName', e.target.value)} />
-                <Input placeholder="العربية" value={getSetting('companyNameAr')} onChange={(e) => updateSetting('companyNameAr', e.target.value)} />
-              </div>
-            </div>
+            <Input label="Company Name" value={getSetting('companyName')} onChange={(e) => { updateSetting('companyName', e.target.value); updateSetting('companyNameAr', e.target.value); }} />
             <Input label="Phone" value={getSetting('companyPhone')} onChange={(e) => updateSetting('companyPhone', e.target.value)} />
             <Input label="Email" value={getSetting('companyEmail')} onChange={(e) => updateSetting('companyEmail', e.target.value)} />
             <Input label="Address (EN)" value={getSetting('companyAddress')} onChange={(e) => updateSetting('companyAddress', e.target.value)} />
@@ -142,14 +135,8 @@ export default function SettingsPage() {
           </div>
           <div className="border-t pt-4 dark:border-slate-700">
             <p className="text-sm font-medium mb-2">Add Custom Payment Method</p>
-            <div className="grid grid-cols-3 gap-2">
-              <div className="col-span-2">
-                <label className="label">Name</label>
-                <div className="flex gap-2">
-                  <Input placeholder="English" value={newPmName} onChange={(e) => setNewPmName(e.target.value)} />
-                  <Input placeholder="العربية" value={newPmNameAr} onChange={(e) => setNewPmNameAr(e.target.value)} />
-                </div>
-              </div>
+            <div className="grid grid-cols-2 gap-2">
+              <Input label="Name" value={newPmName} onChange={(e) => setNewPmName(e.target.value)} />
               <Select options={[
                 { value: 'vodafone_cash', label: 'Vodafone Cash' },
                 { value: 'instapay', label: 'InstaPay' },
@@ -159,11 +146,10 @@ export default function SettingsPage() {
             </div>
             <Button size="sm" className="mt-2" onClick={() => {
               if (newPmName) {
-                store.addCustomPaymentMethod({ name: newPmName, nameAr: newPmNameAr || newPmName, type: newPmType, accountHolder: '', icon: '', isActive: true, sortOrder: store.paymentMethods.length + 1 });
+                store.addCustomPaymentMethod({ name: newPmName, nameAr: newPmName, type: newPmType, accountHolder: '', icon: '', isActive: true, sortOrder: store.paymentMethods.length + 1 });
                 setNewPmName('');
-                setNewPmNameAr('');
                 setNewPmType('vodafone_cash');
-                store.addNotification({ type: 'system', title: 'Payment Method Added', titleAr: 'تم إضافة طريقة الدفع', message: `${newPmName} has been added`, messageAr: `تم إضافة ${newPmNameAr || newPmName}`, module: 'settings', recordId: '', isRead: false, readAt: null });
+                store.addNotification({ type: 'system', title: 'Payment Method Added', titleAr: 'تم إضافة طريقة الدفع', message: `${newPmName} has been added`, messageAr: `تم إضافة ${newPmName}`, module: 'settings', recordId: '', isRead: false, readAt: null });
               }
             }}>Add</Button>
           </div>
