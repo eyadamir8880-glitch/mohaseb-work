@@ -97,6 +97,7 @@ export interface InvoicePayment {
   invoiceId: string;
   amount: number;
   paymentMethod: string;
+  accountId?: string;
   reference: string;
   paidAt: string;
   notes: string;
