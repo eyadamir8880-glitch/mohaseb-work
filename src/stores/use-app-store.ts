@@ -295,9 +295,12 @@ export const useAppStore = create<AppStore>()(
           }
         }
 
+        const defaultSettingsArray = Object.entries(DEFAULT_SETTINGS).map(([key, value]) => ({
+          id: generateId(), key, value: String(value), updatedAt: new Date().toISOString(),
+        }));
         set({
           ...stateData,
-          settings: stateData.settings.length > 0 ? stateData.settings : [],
+          settings: stateData.settings.length > 0 ? stateData.settings : defaultSettingsArray,
           paymentMethods: stateData.paymentMethods.length > 0 ? stateData.paymentMethods : [...PAYMENT_METHODS],
           isInitialized: true,
           lastSaveTime: Date.now(),
