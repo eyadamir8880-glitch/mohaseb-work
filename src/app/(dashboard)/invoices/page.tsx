@@ -11,7 +11,7 @@ import { Modal } from '@/components/ui/modal';
 import { formatCurrency, formatDate, getStatusColor, generateId, generateNumber } from '@/lib/utils';
 import { Plus, Search, Eye, Trash2, Wallet, Receipt, X } from 'lucide-react';
 import { PAYMENT_METHODS } from '@/lib/constants';
-import type { Invoice, InvoiceItem } from '@/lib/types';
+import type { Invoice, InvoiceItem, Customer, Product } from '@/lib/types';
 
 const statusFilters = ['all', 'draft', 'sent', 'paid', 'partially_paid', 'overdue', 'cancelled'] as const;
 
@@ -347,7 +347,7 @@ export default function InvoicesPage() {
               onChange={(e) => setCreateForm({ ...createForm, invoiceNumber: e.target.value })} />
             <Select label={t('invoices.customer')} value={createForm.customerId}
               onChange={(e) => setCreateForm({ ...createForm, customerId: e.target.value })}
-              options={customers.map((c: any) => ({ value: c.id, label: locale === 'ar' ? c.nameAr || c.name : c.name }))}
+              options={customers.map((c: Customer) => ({ value: c.id, label: locale === 'ar' ? c.nameAr || c.name : c.name }))}
               placeholder={t('app.select')} />
             <Input label={t('invoices.issueDate')} type="date" value={createForm.issueDate}
               onChange={(e) => setCreateForm({ ...createForm, issueDate: e.target.value })} />
@@ -364,7 +364,7 @@ export default function InvoicesPage() {
               <div key={i} className="flex gap-2 items-end">
                 <Select value={item.productId}
                   onChange={(e) => handleItemChange(i, 'productId', e.target.value)}
-                  options={products.map((p: any) => ({ value: p.id, label: locale === 'ar' ? p.nameAr || p.name : p.name }))}
+                  options={products.map((p: Product) => ({ value: p.id, label: locale === 'ar' ? p.nameAr || p.name : p.name }))}
                   placeholder={t('app.select')} className="flex-[2]" />
                 <Input type="number" min="1" value={item.quantity}
                   onChange={(e) => handleItemChange(i, 'quantity', e.target.value)}
