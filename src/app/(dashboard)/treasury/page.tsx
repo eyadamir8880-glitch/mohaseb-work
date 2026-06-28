@@ -126,7 +126,7 @@ function TransactionForm({ onSave, onCancel }: { onSave: () => void; onCancel: (
   if (accounts.length === 0) {
     store.addTreasuryAccount({
       name: 'Main Cash', nameAr: 'الخزينة الرئيسية', type: 'cash',
-      balance: 0, currency: 'EGP', isActive: true,
+      balance: 0, currency: 'EGP',
     });
     accounts = store.treasuryAccounts;
   }
