@@ -169,19 +169,26 @@ function stripChildArrays(obj: any): any {
   return result;
 }
 
-async function syncToSupabase(method: 'post' | 'put' | 'delete', endpoint: string, data?: any) {
+async function syncToSupabase(method: 'post' | 'put' | 'delete', endpoint: string, data?: any, retries = 3) {
   if (!isSupabaseConfigured) return;
-  try {
-    const cleanData = stripChildArrays(data);
-    if (method === 'delete') {
-      await apiClient.delete(`${endpoint}/${data.id}`);
-    } else if (method === 'put') {
-      await apiClient.put(`${endpoint}/${data.id}`, cleanData);
-    } else {
-      await apiClient.post(endpoint, cleanData);
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      const cleanData = stripChildArrays(data);
+      if (method === 'delete') {
+        await apiClient.delete(`${endpoint}/${data.id}`);
+      } else if (method === 'put') {
+        await apiClient.put(`${endpoint}/${data.id}`, cleanData);
+      } else {
+        await apiClient.post(endpoint, cleanData);
+      }
+      return;
+    } catch (err) {
+      if (attempt < retries - 1) {
+        await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
+      } else {
+        console.error(`Supabase sync failed (${method} ${endpoint}):`, err);
+      }
     }
-  } catch (err) {
-    console.error(`Supabase sync failed (${method} ${endpoint}):`, err);
   }
 }
 
@@ -251,12 +258,13 @@ export const useAppStore = create<AppStore>()(
         modules.forEach((m, i) => {
           const localData = localState[m] || [];
           const supabaseData = results[i].data || [];
-          if (localData.length > 0) {
-            stateData[m] = localData;
-          } else {
-            stateData[m] = supabaseData;
-            if (supabaseData.length > 0) supabaseHasData = true;
+          const localIds = new Set(localData.map((r: any) => r.id));
+          const merged = [...localData];
+          for (const r of supabaseData) {
+            if (!localIds.has(r.id)) merged.push(r);
           }
+          stateData[m] = merged;
+          if (supabaseData.length > 0) supabaseHasData = true;
         });
 
         if (hasLocalData && !supabaseHasData) {
@@ -684,7 +692,7 @@ export const useAppStore = create<AppStore>()(
     if (treasuryAccounts.length === 0) {
       get().addTreasuryAccount({
         name: 'Main Cash', nameAr: 'الخزينة الرئيسية', type: 'cash',
-        balance: 0, currency: 'EGP', isActive: true,
+        balance: 0, currency: 'EGP', isDefault: true,
       });
       treasuryAccounts = get().treasuryAccounts;
     }
@@ -841,7 +849,7 @@ export const useAppStore = create<AppStore>()(
       if (treasuryAccounts.length === 0) {
         get().addTreasuryAccount({
           name: 'Main Cash', nameAr: 'الخزينة الرئيسية', type: 'cash',
-          balance: 0, currency: 'EGP', isActive: true,
+          balance: 0, currency: 'EGP', isDefault: true,
         });
         treasuryAccounts = get().treasuryAccounts;
       }
