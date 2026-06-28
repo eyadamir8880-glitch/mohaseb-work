@@ -186,7 +186,7 @@ async function syncToSupabase(method: 'post' | 'put' | 'delete', endpoint: strin
       if (attempt < retries - 1) {
         await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
       } else {
-        console.error(`Supabase sync failed (${method} ${endpoint}):`, err?.code, err?.message);
+        console.error(`Supabase sync failed (${method} ${endpoint}):`, err);
       }
     }
   }

@@ -34,8 +34,9 @@ function camelToSnake(obj: any): any {
   if (typeof obj === 'object' && !(obj instanceof Date)) {
     const result: Record<string, any> = {};
     for (const [key, value] of Object.entries(obj)) {
+      if (key.endsWith('Id') && value === '') continue;
       const snakeKey = key.replace(/[A-Z]/g, (c) => `_${c.toLowerCase()}`);
-      result[snakeKey] = (snakeKey.endsWith('_id') && value === '') ? null : camelToSnake(value);
+      result[snakeKey] = camelToSnake(value);
     }
     return result;
   }
@@ -213,13 +214,12 @@ export const apiClient = {
           return responseInterceptor({ data: data as any, status: 201, message: 'Created successfully' });
         }
         const snakeData = camelToSnake(data);
-        console.debug(`POST ${table}:`, JSON.stringify(snakeData).slice(0, 500));
         const { data: inserted, error } = await (getSupabase() as any)
           .from(table)
           .upsert(snakeData, { onConflict: 'id', ignoreDuplicates: false })
           .select()
           .single();
-        if (error) { console.error(`Supabase 400 on ${table}:`, JSON.stringify(snakeData).slice(0, 500), error.message); throw { code: 'SUPABASE_ERROR', message: error.message }; }
+        if (error) throw { code: 'SUPABASE_ERROR', message: error.message };
 
         await (getSupabase() as any).from('audit_logs').insert({
           timestamp: new Date().toISOString(),
