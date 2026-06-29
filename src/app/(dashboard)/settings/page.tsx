@@ -67,6 +67,7 @@ export default function SettingsPage() {
   };
 
   return (
+    <>
     <div className="space-y-6">
       <div className="page-header">
         <h1 className="page-title">{t('settings.title')}</h1>
@@ -234,5 +235,6 @@ export default function SettingsPage() {
           </div>
         </div>
       )}
+    </>
   );
 }

@@ -460,10 +460,9 @@ export const useAppStore = create<AppStore>()(
       const itemsWithInvoice = items.map(item => ({ ...item, invoiceId: invoice.id }));
       try {
         const supabase = getSupabase();
-        const { error } = await supabase.from('invoice_items').insert(itemsWithInvoice.map(camelToSnake));
-        if (error) {
-          itemsWithInvoice.forEach(item => syncToSupabase('post', 'invoice-items', item));
-        }
+        supabase.from('invoice_items').insert(itemsWithInvoice.map(camelToSnake)).then(({ error }: any) => {
+          if (error) itemsWithInvoice.forEach(item => syncToSupabase('post', 'invoice-items', item));
+        }).catch(() => itemsWithInvoice.forEach(item => syncToSupabase('post', 'invoice-items', item)));
       } catch {
         itemsWithInvoice.forEach(item => syncToSupabase('post', 'invoice-items', item));
       }
