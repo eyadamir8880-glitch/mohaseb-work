@@ -85,8 +85,8 @@ const endpointToTable: Record<string, string> = {
 
 function getTable(endpoint: string): string | null {
   const parts = endpoint.split('/').filter(Boolean);
-  const module = parts[0] || '';
-  return endpointToTable[module] || null;
+  const mod = parts[0] || '';
+  return endpointToTable[mod] || null;
 }
 
 function getId(endpoint: string): string | null {
@@ -408,10 +408,10 @@ async function supabaseGetDashboard(): Promise<any> {
 }
 
 function handleGetRequest<T>(endpoint: string, params?: Record<string, any>): T {
-  const module = getModule(endpoint);
+  const mod = getModule(endpoint);
   if (!mockDb) return [] as any;
 
-  switch (module) {
+  switch (mod) {
     case 'customers':
       return filterData(mockDb.customers, params) as any;
     case 'products':
@@ -470,16 +470,16 @@ function handleGetRequest<T>(endpoint: string, params?: Record<string, any>): T 
 }
 
 function handlePostRequest<T>(endpoint: string, data: any): T {
-  const module = getModule(endpoint);
+  const mod = getModule(endpoint);
   if (!mockDb) return data as any;
 
-  const auditLog = createAuditLog('created', module, null, data);
+  const auditLog = createAuditLog('created', mod, null, data);
   mockDb.auditLogs.unshift(auditLog);
-  generateNotification('created', module, data);
+  generateNotification('created', mod, data);
 
   const item = { ...data, id: crypto.randomUUID(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
 
-  switch (module) {
+  switch (mod) {
     case 'customers': mockDb.customers.unshift(item); break;
     case 'products': mockDb.products.unshift(item); break;
     case 'categories': mockDb.categories.unshift(item); break;
@@ -507,7 +507,7 @@ function handlePostRequest<T>(endpoint: string, data: any): T {
 }
 
 function handlePutRequest<T>(endpoint: string, data: any): T {
-  const module = getModule(endpoint);
+  const mod = getModule(endpoint);
   if (!mockDb) return data as any;
 
   let oldValues = null;
@@ -522,7 +522,7 @@ function handlePutRequest<T>(endpoint: string, data: any): T {
   };
 
   let updated;
-  switch (module) {
+  switch (mod) {
     case 'customers': updated = updateCollection(mockDb.customers); break;
     case 'products': updated = updateCollection(mockDb.products); break;
     case 'categories': updated = updateCollection(mockDb.categories); break;
@@ -543,14 +543,14 @@ function handlePutRequest<T>(endpoint: string, data: any): T {
     default: updated = data;
   }
 
-  const auditLog = createAuditLog('updated', module, data.id, data, oldValues);
+  const auditLog = createAuditLog('updated', mod, data.id, data, oldValues);
   mockDb.auditLogs.unshift(auditLog);
 
   return updated as any;
 }
 
 function handleDeleteRequest<T>(endpoint: string): T {
-  const module = getModule(endpoint);
+  const mod = getModule(endpoint);
   const id = endpoint.split('/').pop();
   if (!mockDb || !id) return null as any;
 
@@ -564,7 +564,7 @@ function handleDeleteRequest<T>(endpoint: string): T {
   };
 
   let deleted;
-  switch (module) {
+  switch (mod) {
     case 'customers': deleted = deleteFromCollection(mockDb.customers); break;
     case 'products': deleted = deleteFromCollection(mockDb.products); break;
     case 'categories': deleted = deleteFromCollection(mockDb.categories); break;
@@ -576,7 +576,7 @@ function handleDeleteRequest<T>(endpoint: string): T {
   }
 
   if (deleted) {
-    const auditLog = createAuditLog('deleted', module, id, null, deleted);
+    const auditLog = createAuditLog('deleted', mod, id, null, deleted);
     mockDb.auditLogs.unshift(auditLog);
   }
 

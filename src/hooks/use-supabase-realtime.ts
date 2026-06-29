@@ -60,33 +60,33 @@ export function useSupabaseRealtime() {
         { event: '*', schema: 'public' },
         async (payload) => {
           const table = payload.table as string;
-          const module = TABLE_MODULE_MAP[table];
-          if (!module || module === 'invoiceItems' || module === 'returnItems' || module === 'deliveries') return;
+          const mod = TABLE_MODULE_MAP[table];
+          if (!mod || mod === 'invoiceItems' || mod === 'returnItems' || mod === 'deliveries') return;
 
           if ((payload as any).event_type === 'DELETE') {
             const recordId = (payload as any).old?.id;
             if (recordId) {
               useAppStore.setState((state: any) => {
-                const arr = state[module];
+                const arr = state[mod];
                 if (!Array.isArray(arr)) return {};
-                return { [module]: arr.filter((r: any) => r.id !== recordId) };
+                return { [mod]: arr.filter((r: any) => r.id !== recordId) };
               });
             }
             return;
           }
 
-          if (debounceRef.current[module]) {
-            clearTimeout(debounceRef.current[module]);
+          if (debounceRef.current[mod]) {
+            clearTimeout(debounceRef.current[mod]);
           }
 
-          debounceRef.current[module] = window.setTimeout(async () => {
+          debounceRef.current[mod] = window.setTimeout(async () => {
             try {
-              const res = await apiClient.get<any[]>(module);
+              const res = await apiClient.get<any[]>(mod);
               if (res.data) {
-                await mergeWithLocal(module, res.data);
+                await mergeWithLocal(mod, res.data);
               }
             } catch (err) {
-              console.error(`Realtime refetch failed for ${module}:`, err);
+              console.error(`Realtime refetch failed for ${mod}:`, err);
             }
           }, 500);
         }

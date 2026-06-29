@@ -322,9 +322,9 @@ export const useAppStore = create<AppStore>()(
         'settings', 'importHistory', 'discountRules', 'paymentMethods',
         'customerStatements',
       ];
-      for (const module of requiredModules) {
-        if (!Array.isArray(state[module])) {
-          console.error(`Invalid backup: missing ${module} module data`);
+      for (const mod of requiredModules) {
+        if (!Array.isArray(state[mod])) {
+          console.error(`Invalid backup: missing ${mod} module data`);
           return false;
         }
       }
