@@ -51,11 +51,6 @@ const POLL_MODULES = [
   'externalPurchases', 'customerStatements',
 ];
 
-const MODULE_TO_TABLE: Record<string, string> = {};
-for (const [table, module] of Object.entries(TABLE_MODULE_MAP)) {
-  MODULE_TO_TABLE[module] = table;
-}
-
 export function useSupabaseRealtime() {
   const isInitialized = useAppStore((s) => s.isInitialized);
   const channelRef = useRef<RealtimeChannel | null>(null);
