@@ -14,25 +14,20 @@ import { Trash2 } from 'lucide-react';
 export default function ReturnsPage() {
   const { language, t } = useLanguage();
   const store = useAppStore();
-  const { returns, invoices, purchaseOrders } = store;
+  const { returns, invoices } = store;
   const [showModal, setShowModal] = useState(false);
-  const [returnType, setReturnType] = useState<'customer' | 'supplier'>('customer');
   const [showDeleteAll, setShowDeleteAll] = useState(false);
 
   const columns = [
     { key: 'returnNumber', header: 'Return #', sortable: true },
     { key: 'type', header: t('app.type'), render: (item: any) => (
-      <span className={`badge ${item.type === 'customer' ? 'badge-blue' : 'badge-yellow'}`}>
-        {item.type === 'customer' ? t('returns.customerReturn') : t('returns.supplierReturn')}
+      <span className="badge badge-blue">
+        {t('returns.customerReturn')}
       </span>
     )},
     { key: 'originalInvoiceId', header: t('returns.originalInvoice'), render: (item: any) => {
-      if (item.type === 'customer') {
-        const inv = invoices.find(i => i.id === item.originalInvoiceId);
-        return inv?.invoiceNumber || '-';
-      }
-      const po = purchaseOrders.find(p => p.id === item.originalPOId);
-      return po?.poNumber || '-';
+      const inv = invoices.find(i => i.id === item.originalInvoiceId);
+      return inv?.invoiceNumber || '-';
     }},
     { key: 'refundAmount', header: t('returns.refundAmount'), render: (item: any) => formatCurrency(item.refundAmount, 'EGP', language) },
     { key: 'condition', header: t('returns.condition'), render: (item: any) => (
@@ -62,25 +57,23 @@ export default function ReturnsPage() {
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
           </svg>
           {t('returns.addNew')}
-        </Button>
-      </div>
-    </div>
-      
-      <DataTable columns={columns} data={returns.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())} emptyMessage={t('app.noData')} />
-
-      {showDeleteAll && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div className="fixed inset-0 bg-black/50" onClick={() => setShowDeleteAll(false)} />
-          <div className="relative bg-background rounded-lg shadow-xl w-full max-w-sm mx-4 p-6">
-            <h2 className="text-lg font-semibold mb-2">{t('app.deleteAll')}</h2>
-            <p className="text-sm text-muted-foreground mb-4">{t('app.deleteAllWarning')}</p>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowDeleteAll(false)}>{t('app.cancel')}</Button>
-              <Button variant="danger" onClick={handleDeleteAll}>{t('app.yesDelete')}</Button>
-            </div>
-          </div>
+          </Button>
         </div>
-      )}
+      </div>
+
+      <DataTable
+        columns={columns}
+        data={returns.filter(r => r.type === 'customer')}
+        searchable
+        sortable
+      />
+
+      <Modal isOpen={showDeleteAll} onClose={() => setShowDeleteAll(false)} title={t('app.deleteAllWarning')}>
+        <div className="flex justify-end gap-2 mt-4">
+          <Button variant="outline" onClick={() => setShowDeleteAll(false)}>{t('app.cancel')}</Button>
+          <Button variant="primary" onClick={handleDeleteAll} className="bg-red-600 hover:bg-red-700">{t('app.deleteAll')}</Button>
+        </div>
+      </Modal>
 
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={t('returns.addNew')} size="wide">
         <ReturnForm onSave={() => setShowModal(false)} onCancel={() => setShowModal(false)} />
@@ -92,26 +85,17 @@ export default function ReturnsPage() {
 function ReturnForm({ onSave, onCancel }: { onSave: () => void; onCancel: () => void }) {
   const { t, language } = useLanguage();
   const store = useAppStore();
-  const { invoices, purchaseOrders } = store;
-  const [type, setType] = useState<'customer' | 'supplier'>('customer');
+  const { invoices } = store;
   const [originalInvoiceId, setOriginalInvoiceId] = useState('');
-  const [originalPOId, setOriginalPOId] = useState('');
   const [condition, setCondition] = useState<'good' | 'bad'>('good');
   const [reason, setReason] = useState('');
   const [items, setItems] = useState<any[]>([]);
 
   const selectedInvoice = invoices.find(i => i.id === originalInvoiceId);
-  const selectedPO = purchaseOrders.find(p => p.id === originalPOId);
 
   const loadInvoiceItems = () => {
     if (selectedInvoice) {
       setItems(selectedInvoice.items.map(item => ({ ...item, returnQty: 0, refundAmount: 0 })));
-    }
-  };
-
-  const loadPOItems = () => {
-    if (selectedPO) {
-      setItems(selectedPO.items.map(item => ({ ...item, returnQty: 0, refundAmount: 0, unitPrice: item.unitPrice })));
     }
   };
 
@@ -125,8 +109,7 @@ function ReturnForm({ onSave, onCancel }: { onSave: () => void; onCancel: () => 
 
     const totalRefund = returnItems.reduce((s, i) => s + i.refundAmount, 0);
 
-    if (type === 'customer' && selectedInvoice) {
-      // Restock good items
+    if (selectedInvoice) {
       returnItems.filter(i => condition === 'good').forEach(item => {
         const product = store.products.find(p => p.id === item.productId);
         if (product) store.updateProduct(product.id, { stock: product.stock + item.quantity });
@@ -140,23 +123,11 @@ function ReturnForm({ onSave, onCancel }: { onSave: () => void; onCancel: () => 
       store.updateInvoice(selectedInvoice.id, {
         status: selectedInvoice.grandTotal <= totalRefund ? 'fully_returned' : 'partially_returned',
       });
-    } else if (type === 'supplier' && selectedPO) {
-      // Decrease stock
-      returnItems.forEach(item => {
-        const product = store.products.find(p => p.id === item.productId);
-        if (product) store.updateProduct(product.id, { stock: Math.max(0, product.stock - item.quantity) });
-        store.addStockMovement({
-          productId: item.productId, variantId: item.variantId, type: 'out', quantity: item.quantity,
-          reason: 'Supplier Return', date: new Date().toISOString().split('T')[0],
-          referenceType: 'return', referenceId: '', warehouseId: store.warehouses[0]?.id || '',
-        });
-      });
     }
 
     store.addReturn({
       returnNumber: `RET-${String(store.returns.length + 1).padStart(3, '0')}`,
-      type, originalInvoiceId: type === 'customer' ? originalInvoiceId : null,
-      originalPOId: type === 'supplier' ? originalPOId : null,
+      type: 'customer', originalInvoiceId, originalPOId: null,
       items: returnItems, refundAmount: totalRefund, refundMethod: 'cash',
       status: 'completed',
     });
@@ -166,28 +137,10 @@ function ReturnForm({ onSave, onCancel }: { onSave: () => void; onCancel: () => 
 
   return (
     <div className="space-y-4">
-      <Select label={t('app.type')} value={type} onChange={(e) => setType(e.target.value as any)}
-        options={[
-          { value: 'customer', label: t('returns.customerReturn') },
-          { value: 'supplier', label: t('returns.supplierReturn') },
-        ]} />
-
-      {type === 'customer' ? (
-        <>
-          <Select label={t('returns.originalInvoice')} value={originalInvoiceId} onChange={(e) => { setOriginalInvoiceId(e.target.value); }} placeholder={t('app.search')}
-            options={invoices.filter(i => ['sent', 'partially_paid', 'paid'].includes(i.status)).map(inv => ({ value: inv.id, label: `${inv.invoiceNumber} - ${formatCurrency(inv.grandTotal, 'EGP', language)}` }))} />
-          {originalInvoiceId && (
-            <Button variant="outline" size="sm" onClick={loadInvoiceItems}>{t('invoices.items')}</Button>
-          )}
-        </>
-      ) : (
-        <>
-          <Select label={t('returns.originalPO')} value={originalPOId} onChange={(e) => { setOriginalPOId(e.target.value); }} placeholder={t('app.search')}
-            options={purchaseOrders.filter(p => ['received', 'paid'].includes(p.status)).map(po => ({ value: po.id, label: `${po.poNumber} - ${formatCurrency(po.grandTotal, 'EGP', language)}` }))} />
-          {originalPOId && (
-            <Button variant="outline" size="sm" onClick={loadPOItems}>{t('purchaseOrders.items')}</Button>
-          )}
-        </>
+      <Select label={t('returns.originalInvoice')} value={originalInvoiceId} onChange={(e) => { setOriginalInvoiceId(e.target.value); }} placeholder={t('app.search')}
+        options={invoices.filter(i => ['sent', 'partially_paid', 'paid'].includes(i.status)).map(inv => ({ value: inv.id, label: `${inv.invoiceNumber} - ${formatCurrency(inv.grandTotal, 'EGP', language)}` }))} />
+      {originalInvoiceId && (
+        <Button variant="outline" size="sm" onClick={loadInvoiceItems}>{t('invoices.items')}</Button>
       )}
 
       {items.length > 0 && (

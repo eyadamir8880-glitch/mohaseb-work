@@ -6,12 +6,12 @@ import { generateId } from '@/lib/utils';
 import { apiClient, camelToSnake, batchDeleteFromSupabase } from '@/lib/api-client';
 import { isSupabaseConfigured, getSupabase } from '@/lib/supabase';
 import type {
-  Customer, Supplier, Product, ProductVariant, Category,
-  Invoice, InvoicePayment, Quotation, PurchaseOrder, Return, ReturnItem,
+  Customer, Product, Category,
+  Invoice, InvoicePayment, Return, ReturnItem,
   TreasuryAccount, TreasuryTransaction, Warehouse, StockMovement,
-  Employee, PayrollRecord, Asset, JournalEntry, ChartOfAccount,
+  ChartOfAccount,
   Notification, AuditLog, Setting, ImportSession, DiscountRule, PaymentMethod,
-  ExternalPurchase, CustomerStatement
+  CustomerStatement, FiscalYear
 } from '@/lib/types';
 
 interface AppStore {
@@ -19,22 +19,14 @@ interface AppStore {
   theme: 'light' | 'dark';
 
   customers: Customer[];
-  suppliers: Supplier[];
   products: Product[];
-  variants: ProductVariant[];
   categories: Category[];
   invoices: Invoice[];
-  quotations: Quotation[];
-  purchaseOrders: PurchaseOrder[];
   returns: Return[];
   treasuryAccounts: TreasuryAccount[];
   treasuryTransactions: TreasuryTransaction[];
   warehouses: Warehouse[];
   stockMovements: StockMovement[];
-  employees: Employee[];
-  payrollRecords: PayrollRecord[];
-  assets: Asset[];
-  journalEntries: JournalEntry[];
   chartOfAccounts: ChartOfAccount[];
   notifications: Notification[];
   auditLogs: AuditLog[];
@@ -42,8 +34,8 @@ interface AppStore {
   importHistory: ImportSession[];
   discountRules: DiscountRule[];
   paymentMethods: PaymentMethod[];
-  externalPurchases: ExternalPurchase[];
   customerStatements: CustomerStatement[];
+  fiscalYears: FiscalYear[];
 
   sidebarCollapsed: boolean;
   isInitialized: boolean;
@@ -63,18 +55,10 @@ interface AppStore {
   updateCustomer: (id: string, data: Partial<Customer>) => void;
   deleteCustomer: (id: string) => void;
 
-  addSupplier: (supplier: Omit<Supplier, 'id' | 'createdAt' | 'updatedAt'>) => Supplier;
-  updateSupplier: (id: string, data: Partial<Supplier>) => void;
-  deleteSupplier: (id: string) => void;
-
   addProduct: (product: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>) => Product;
   bulkAddProducts: (products: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>[]) => Product[];
   updateProduct: (id: string, data: Partial<Product>) => void;
   deleteProduct: (id: string) => void;
-
-  addVariant: (variant: Omit<ProductVariant, 'id' | 'createdAt'>) => ProductVariant;
-  updateVariant: (id: string, data: Partial<ProductVariant>) => void;
-  deleteVariant: (id: string) => void;
 
   addCategory: (category: Omit<Category, 'id' | 'createdAt'>) => Category;
   updateCategory: (id: string, data: Partial<Category>) => void;
@@ -84,14 +68,6 @@ interface AppStore {
   updateInvoice: (id: string, data: Partial<Invoice>) => void;
   deleteInvoice: (id: string) => void;
   recordPayment: (invoiceId: string, payment: Omit<InvoicePayment, 'id' | 'createdAt'>) => InvoicePayment;
-
-  addQuotation: (quotation: Omit<Quotation, 'id' | 'createdAt' | 'updatedAt'>) => Quotation;
-  updateQuotation: (id: string, data: Partial<Quotation>) => void;
-  deleteQuotation: (id: string) => void;
-
-  addPurchaseOrder: (po: Omit<PurchaseOrder, 'id' | 'createdAt' | 'updatedAt'>) => PurchaseOrder;
-  updatePurchaseOrder: (id: string, data: Partial<PurchaseOrder>) => void;
-  deletePurchaseOrder: (id: string) => void;
 
   addReturn: (ret: Omit<Return, 'id' | 'createdAt'>) => Return;
   updateReturn: (id: string, data: Partial<Return>) => void;
@@ -109,21 +85,6 @@ interface AppStore {
   deleteWarehouse: (id: string) => void;
 
   addStockMovement: (movement: Omit<StockMovement, 'id' | 'createdAt'>) => StockMovement;
-
-  addEmployee: (employee: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'>) => Employee;
-  updateEmployee: (id: string, data: Partial<Employee>) => void;
-  deleteEmployee: (id: string) => void;
-
-  addPayrollRecord: (record: Omit<PayrollRecord, 'id' | 'createdAt'>) => PayrollRecord;
-  updatePayrollRecord: (id: string, data: Partial<PayrollRecord>) => void;
-
-  addAsset: (asset: Omit<Asset, 'id' | 'createdAt'>) => Asset;
-  updateAsset: (id: string, data: Partial<Asset>) => void;
-  deleteAsset: (id: string) => void;
-
-  addJournalEntry: (entry: Omit<JournalEntry, 'id' | 'createdAt'>) => JournalEntry;
-  updateJournalEntry: (id: string, data: Partial<JournalEntry>) => void;
-  deleteJournalEntry: (id: string) => void;
 
   addChartOfAccount: (account: Omit<ChartOfAccount, 'id' | 'createdAt'>) => ChartOfAccount;
   updateChartOfAccount: (id: string, data: Partial<ChartOfAccount>) => void;
@@ -148,13 +109,14 @@ interface AppStore {
   updatePaymentMethod: (id: string, data: Partial<PaymentMethod>) => void;
   addCustomPaymentMethod: (method: Omit<PaymentMethod, 'id' | 'isProtected'>) => PaymentMethod;
 
-  addExternalPurchase: (data: Omit<ExternalPurchase, 'id' | 'createdAt'>) => ExternalPurchase;
-  bulkAddExternalPurchases: (data: Omit<ExternalPurchase, 'id' | 'createdAt'>[]) => ExternalPurchase[];
-  deleteExternalPurchase: (id: string) => void;
-  updateExternalPurchaseProductId: (id: string, productId: string | null) => void;
-
   addCustomerStatement: (data: Omit<CustomerStatement, 'id' | 'createdAt'>) => CustomerStatement;
   getCustomerStatements: (customerId: string) => CustomerStatement[];
+
+  addFiscalYear: (data: Omit<FiscalYear, 'id' | 'createdAt'>) => FiscalYear;
+  updateFiscalYear: (id: string, data: Partial<FiscalYear>) => void;
+  closeFiscalYear: (id: string) => void;
+  deleteFiscalYear: (id: string) => void;
+
 }
 
 function stripChildArrays(obj: any): any {
@@ -198,22 +160,14 @@ export const useAppStore = create<AppStore>()(
   language: 'en',
   theme: 'light',
   customers: [],
-  suppliers: [],
   products: [],
-  variants: [],
   categories: [],
   invoices: [],
-  quotations: [],
-  purchaseOrders: [],
   returns: [],
   treasuryAccounts: [],
   treasuryTransactions: [],
   warehouses: [],
   stockMovements: [],
-  employees: [],
-  payrollRecords: [],
-  assets: [],
-  journalEntries: [],
   chartOfAccounts: [],
   notifications: [],
   auditLogs: [],
@@ -221,8 +175,8 @@ export const useAppStore = create<AppStore>()(
   importHistory: [],
   discountRules: [],
   paymentMethods: [...PAYMENT_METHODS],
-  externalPurchases: [],
   customerStatements: [],
+  fiscalYears: [],
   sidebarCollapsed: false,
   isInitialized: false,
   lastSaveTime: null,
@@ -233,13 +187,12 @@ export const useAppStore = create<AppStore>()(
 
   initializeStore: async () => {
     const modules = [
-      'customers', 'suppliers', 'products', 'variants', 'categories',
-      'invoices', 'quotations', 'purchaseOrders', 'returns',
+      'customers', 'products', 'categories',
+      'invoices', 'returns',
       'treasuryAccounts', 'treasuryTransactions', 'warehouses',
-      'stockMovements', 'employees', 'payrollRecords', 'assets',
-      'journalEntries', 'chartOfAccounts', 'notifications', 'auditLogs',
+      'stockMovements', 'chartOfAccounts', 'notifications', 'auditLogs',
       'settings', 'importHistory', 'discountRules', 'paymentMethods',
-      'externalPurchases', 'customerStatements',
+      'customerStatements', 'fiscalYears',
     ] as const;
 
     const localState: Record<string, any[]> = {};
@@ -269,13 +222,12 @@ export const useAppStore = create<AppStore>()(
 
         if (hasLocalData && !supabaseHasData) {
           const tableMap: Record<string, string> = {
-            purchaseOrders: 'purchase_orders', treasuryAccounts: 'treasury_accounts',
+            treasuryAccounts: 'treasury_accounts',
             treasuryTransactions: 'treasury_transactions', stockMovements: 'stock_movements',
-            journalEntries: 'journal_entries', chartOfAccounts: 'chart_of_accounts',
+            chartOfAccounts: 'chart_of_accounts',
             auditLogs: 'audit_logs', importHistory: 'import_sessions',
             discountRules: 'discount_rules', paymentMethods: 'payment_methods',
-            payrollRecords: 'payroll_records', externalPurchases: 'external_purchases',
-            customerStatements: 'customer_statements', variants: 'product_variants',
+            customerStatements: 'customer_statements', fiscalYears: 'fiscal_years',
           };
           const supabase = getSupabase();
           for (const m of modules) {
@@ -363,13 +315,12 @@ export const useAppStore = create<AppStore>()(
   loadState: (state: any) => {
     try {
       const requiredModules = [
-        'customers', 'suppliers', 'products', 'variants', 'categories',
-        'invoices', 'quotations', 'purchaseOrders', 'returns',
+        'customers', 'products', 'categories',
+        'invoices', 'returns',
         'treasuryAccounts', 'treasuryTransactions', 'warehouses',
-        'stockMovements', 'employees', 'payrollRecords', 'assets',
-        'journalEntries', 'chartOfAccounts', 'notifications', 'auditLogs',
+        'stockMovements', 'chartOfAccounts', 'notifications', 'auditLogs',
         'settings', 'importHistory', 'discountRules', 'paymentMethods',
-        'externalPurchases', 'customerStatements',
+        'customerStatements',
       ];
       for (const module of requiredModules) {
         if (!Array.isArray(state[module])) {
@@ -385,13 +336,12 @@ export const useAppStore = create<AppStore>()(
 
       if (isSupabaseConfigured) {
         const tableMap: Record<string, string> = {
-          purchaseOrders: 'purchase_orders', treasuryAccounts: 'treasury_accounts',
+          treasuryAccounts: 'treasury_accounts',
           treasuryTransactions: 'treasury_transactions', stockMovements: 'stock_movements',
-          journalEntries: 'journal_entries', chartOfAccounts: 'chart_of_accounts',
+          chartOfAccounts: 'chart_of_accounts',
           auditLogs: 'audit_logs', importHistory: 'import_sessions',
           discountRules: 'discount_rules', paymentMethods: 'payment_methods',
-          payrollRecords: 'payroll_records', externalPurchases: 'external_purchases',
-          customerStatements: 'customer_statements', variants: 'product_variants',
+          customerStatements: 'customer_statements',
         };
         const supabase = getSupabase();
         for (const m of requiredModules) {
@@ -446,35 +396,6 @@ export const useAppStore = create<AppStore>()(
     syncToSupabase('delete', 'customers', { id });
   },
 
-  addSupplier: (data) => {
-    const supplier: Supplier = { ...data, id: generateId(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
-    set((state) => ({ suppliers: [supplier, ...state.suppliers] }));
-    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'created', module: 'suppliers', recordId: supplier.id, oldValues: null, newValues: data, ip: '' });
-    syncToSupabase('post', 'suppliers', supplier);
-    return supplier;
-  },
-  updateSupplier: (id, data) => {
-    const old = get().suppliers.find(s => s.id === id);
-    set((state) => ({ suppliers: state.suppliers.map(s => s.id === id ? { ...s, ...data, updatedAt: new Date().toISOString() } : s) }));
-    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'updated', module: 'suppliers', recordId: id, oldValues: old, newValues: data, ip: '' });
-    syncToSupabase('put', 'suppliers', { id, ...data });
-  },
-  deleteSupplier: (id) => {
-    const old = get().suppliers.find(s => s.id === id);
-    const state = get();
-    const supplierPOs = state.purchaseOrders.filter(po => po.supplierId === id);
-    const poIds = supplierPOs.map(po => po.id);
-    const poItemIds = supplierPOs.flatMap(po => (po.items || []).map(item => item.id));
-    batchDeleteFromSupabase('purchase-order-items', poItemIds);
-    batchDeleteFromSupabase('purchaseOrders', poIds);
-    set((state) => ({
-      suppliers: state.suppliers.filter(s => s.id !== id),
-      purchaseOrders: state.purchaseOrders.filter(po => po.supplierId !== id),
-    }));
-    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'deleted', module: 'suppliers', recordId: id, oldValues: old, newValues: null, ip: '' });
-    syncToSupabase('delete', 'suppliers', { id });
-  },
-
   addProduct: (data) => {
     const product: Product = { ...data, id: generateId(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
     set((state) => ({ products: [product, ...state.products] }));
@@ -502,7 +423,7 @@ export const useAppStore = create<AppStore>()(
   },
   deleteProduct: (id) => {
     const old = get().products.find(p => p.id === id);
-    set((state) => ({ products: state.products.filter(p => p.id !== id), variants: state.variants.filter(v => v.productId !== id) }));
+    set((state) => ({ products: state.products.filter(p => p.id !== id) }));
     get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'deleted', module: 'products', recordId: id, oldValues: old, newValues: null, ip: '' });
     const state = get();
     const invoiceItemIds = state.invoices.flatMap(i => (i.items || []).filter(item => item.productId === id).map(item => item.id));
@@ -512,21 +433,6 @@ export const useAppStore = create<AppStore>()(
     batchDeleteFromSupabase('stockMovements', stockMovementIds);
     batchDeleteFromSupabase('returnItems', returnItemIds);
     syncToSupabase('delete', 'products', { id });
-  },
-
-  addVariant: (data) => {
-    const variant: ProductVariant = { ...data, id: generateId(), createdAt: new Date().toISOString() };
-    set((state) => ({ variants: [variant, ...state.variants] }));
-    syncToSupabase('post', 'variants', variant);
-    return variant;
-  },
-  updateVariant: (id, data) => {
-    set((state) => ({ variants: state.variants.map(v => v.id === id ? { ...v, ...data } : v) }));
-    syncToSupabase('put', 'variants', { id, ...data });
-  },
-  deleteVariant: (id) => {
-    set((state) => ({ variants: state.variants.filter(v => v.id !== id) }));
-    syncToSupabase('delete', 'variants', { id });
   },
 
   addCategory: (data) => {
@@ -774,74 +680,6 @@ export const useAppStore = create<AppStore>()(
     return payment;
   },
 
-  addQuotation: (data) => {
-    const quotation: Quotation = { ...data, id: generateId(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
-    set((state) => ({ quotations: [quotation, ...state.quotations] }));
-    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'created', module: 'quotations', recordId: quotation.id, oldValues: null, newValues: data, ip: '' });
-    const { items, ...quotationFields } = quotation;
-    syncToSupabase('post', 'quotations', quotationFields);
-    if (items && items.length > 0 && isSupabaseConfigured) {
-      try {
-        const supabase = getSupabase();
-        supabase.from('quotation_items').insert(items.map(item => camelToSnake({ ...item, quotationId: quotation.id }))).then(() => {}).catch((e: any) => {
-          console.error('Batch insert quotation_items failed:', e);
-          items.forEach(item => syncToSupabase('post', 'quotation-items', { ...item, quotationId: quotation.id }));
-        });
-      } catch {
-        items.forEach(item => syncToSupabase('post', 'quotation-items', { ...item, quotationId: quotation.id }));
-      }
-    } else if (items) {
-      items.forEach(item => syncToSupabase('post', 'quotation-items', { ...item, quotationId: quotation.id }));
-    }
-    return quotation;
-  },
-  updateQuotation: (id, data) => {
-    const old = get().quotations.find(q => q.id === id);
-    set((state) => ({ quotations: state.quotations.map(q => q.id === id ? { ...q, ...data, updatedAt: new Date().toISOString() } : q) }));
-    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'updated', module: 'quotations', recordId: id, oldValues: old, newValues: data, ip: '' });
-    syncToSupabase('put', 'quotations', { id, ...data });
-  },
-  deleteQuotation: (id) => {
-    const old = get().quotations.find(q => q.id === id);
-    set((state) => ({ quotations: state.quotations.filter(q => q.id !== id) }));
-    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'deleted', module: 'quotations', recordId: id, oldValues: old, newValues: null, ip: '' });
-    syncToSupabase('delete', 'quotations', { id });
-  },
-
-  addPurchaseOrder: (data) => {
-    const po: PurchaseOrder = { ...data, id: generateId(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
-    set((state) => ({ purchaseOrders: [po, ...state.purchaseOrders] }));
-    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'created', module: 'purchaseOrders', recordId: po.id, oldValues: null, newValues: data, ip: '' });
-    const { items, ...poFields } = po;
-    syncToSupabase('post', 'purchaseOrders', poFields);
-    if (items && items.length > 0 && isSupabaseConfigured) {
-      try {
-        const supabase = getSupabase();
-        supabase.from('purchase_order_items').insert(items.map(item => camelToSnake({ ...item, purchaseOrderId: po.id }))).then(() => {}).catch((e: any) => {
-          console.error('Batch insert purchase_order_items failed:', e);
-          items.forEach(item => syncToSupabase('post', 'purchase-order-items', { ...item, purchaseOrderId: po.id }));
-        });
-      } catch {
-        items.forEach(item => syncToSupabase('post', 'purchase-order-items', { ...item, purchaseOrderId: po.id }));
-      }
-    } else if (items) {
-      items.forEach(item => syncToSupabase('post', 'purchase-order-items', { ...item, purchaseOrderId: po.id }));
-    }
-    return po;
-  },
-  updatePurchaseOrder: (id, data) => {
-    const old = get().purchaseOrders.find(p => p.id === id);
-    set((state) => ({ purchaseOrders: state.purchaseOrders.map(p => p.id === id ? { ...p, ...data, updatedAt: new Date().toISOString() } : p) }));
-    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'updated', module: 'purchaseOrders', recordId: id, oldValues: old, newValues: data, ip: '' });
-    syncToSupabase('put', 'purchaseOrders', { id, ...data });
-  },
-  deletePurchaseOrder: (id) => {
-    const old = get().purchaseOrders.find(p => p.id === id);
-    set((state) => ({ purchaseOrders: state.purchaseOrders.filter(p => p.id !== id) }));
-    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'deleted', module: 'purchaseOrders', recordId: id, oldValues: old, newValues: null, ip: '' });
-    syncToSupabase('delete', 'purchaseOrders', { id });
-  },
-
   addReturn: (data) => {
     const ret: Return = { ...data, id: generateId(), createdAt: new Date().toISOString() };
     set((state) => ({ returns: [ret, ...state.returns] }));
@@ -992,63 +830,6 @@ export const useAppStore = create<AppStore>()(
     return movement;
   },
 
-  addEmployee: (data) => {
-    const emp: Employee = { ...data, id: generateId(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
-    set((state) => ({ employees: [emp, ...state.employees] }));
-    syncToSupabase('post', 'employees', emp);
-    return emp;
-  },
-  updateEmployee: (id, data) => {
-    set((state) => ({ employees: state.employees.map(e => e.id === id ? { ...e, ...data, updatedAt: new Date().toISOString() } : e) }));
-    syncToSupabase('put', 'employees', { id, ...data });
-  },
-  deleteEmployee: (id) => {
-    set((state) => ({ employees: state.employees.filter(e => e.id !== id) }));
-    syncToSupabase('delete', 'employees', { id });
-  },
-
-  addPayrollRecord: (data) => {
-    const record: PayrollRecord = { ...data, id: generateId(), createdAt: new Date().toISOString() };
-    set((state) => ({ payrollRecords: [record, ...state.payrollRecords] }));
-    syncToSupabase('post', 'payrollRecords', record);
-    return record;
-  },
-  updatePayrollRecord: (id, data) => {
-    set((state) => ({ payrollRecords: state.payrollRecords.map(r => r.id === id ? { ...r, ...data } : r) }));
-    syncToSupabase('put', 'payrollRecords', { id, ...data });
-  },
-
-  addAsset: (data) => {
-    const asset: Asset = { ...data, id: generateId(), createdAt: new Date().toISOString() };
-    set((state) => ({ assets: [asset, ...state.assets] }));
-    syncToSupabase('post', 'assets', asset);
-    return asset;
-  },
-  updateAsset: (id, data) => {
-    set((state) => ({ assets: state.assets.map(a => a.id === id ? { ...a, ...data } : a) }));
-    syncToSupabase('put', 'assets', { id, ...data });
-  },
-  deleteAsset: (id) => {
-    set((state) => ({ assets: state.assets.filter(a => a.id !== id) }));
-    syncToSupabase('delete', 'assets', { id });
-  },
-
-  addJournalEntry: (data) => {
-    const entry: JournalEntry = { ...data, id: generateId(), createdAt: new Date().toISOString() };
-    set((state) => ({ journalEntries: [entry, ...state.journalEntries] }));
-    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'created', module: 'journalEntries', recordId: entry.id, oldValues: null, newValues: data, ip: '' });
-    syncToSupabase('post', 'journalEntries', entry);
-    return entry;
-  },
-  updateJournalEntry: (id, data) => {
-    set((state) => ({ journalEntries: state.journalEntries.map(e => e.id === id ? { ...e, ...data } : e) }));
-    syncToSupabase('put', 'journalEntries', { id, ...data });
-  },
-  deleteJournalEntry: (id) => {
-    set((state) => ({ journalEntries: state.journalEntries.filter(e => e.id !== id) }));
-    syncToSupabase('delete', 'journalEntries', { id });
-  },
-
   addChartOfAccount: (data) => {
     const account: ChartOfAccount = { ...data, id: generateId(), createdAt: new Date().toISOString() };
     set((state) => ({ chartOfAccounts: [...state.chartOfAccounts, account] }));
@@ -1162,33 +943,6 @@ export const useAppStore = create<AppStore>()(
     return method;
   },
 
-  addExternalPurchase: (data) => {
-    const purchase: ExternalPurchase = { ...data, id: generateId(), createdAt: new Date().toISOString() };
-    set((state) => ({ externalPurchases: [purchase, ...state.externalPurchases] }));
-    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'created', module: 'externalPurchases', recordId: purchase.id, oldValues: null, newValues: data, ip: '' });
-    syncToSupabase('post', 'externalPurchases', purchase);
-    return purchase;
-  },
-  bulkAddExternalPurchases: (dataArr) => {
-    const purchases = dataArr.map(data => ({ ...data, id: generateId(), createdAt: new Date().toISOString() } as ExternalPurchase));
-    set((state) => ({ externalPurchases: [...purchases, ...state.externalPurchases] }));
-    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'created', module: 'externalPurchases', recordId: `${purchases.length} bulk`, oldValues: null, newValues: { count: purchases.length }, ip: '' });
-    if (isSupabaseConfigured) {
-      try { (getSupabase() as any).from('external_purchases').insert(purchases.map(p => camelToSnake(p))).then(() => {}).catch((e: any) => console.error('Batch insert external purchases failed:', e)); } catch {}
-    }
-    return purchases;
-  },
-  deleteExternalPurchase: (id) => {
-    const old = get().externalPurchases.find(p => p.id === id);
-    set((state) => ({ externalPurchases: state.externalPurchases.filter(p => p.id !== id) }));
-    get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'deleted', module: 'externalPurchases', recordId: id, oldValues: old, newValues: null, ip: '' });
-    syncToSupabase('delete', 'externalPurchases', { id });
-  },
-  updateExternalPurchaseProductId: (id, productId) => {
-    set((state) => ({ externalPurchases: state.externalPurchases.map(p => p.id === id ? { ...p, productId } : p) }));
-    syncToSupabase('put', 'externalPurchases', { id, productId });
-  },
-
   addCustomerStatement: (data) => {
     const statement: CustomerStatement = { ...data, id: generateId(), createdAt: new Date().toISOString() };
     set((state) => ({ customerStatements: [statement, ...state.customerStatements] }));
@@ -1198,6 +952,30 @@ export const useAppStore = create<AppStore>()(
   getCustomerStatements: (customerId) => {
     return get().customerStatements.filter(s => s.customerId === customerId).sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
   },
+
+  addFiscalYear: (data) => {
+    const year: FiscalYear = { ...data, id: generateId(), createdAt: new Date().toISOString() };
+    set((state) => ({ fiscalYears: [...state.fiscalYears, year] }));
+    syncToSupabase('post', 'fiscalYears', year);
+    return year;
+  },
+  updateFiscalYear: (id, data) => {
+    set((state) => ({ fiscalYears: state.fiscalYears.map(y => y.id === id ? { ...y, ...data } : y) }));
+    syncToSupabase('put', 'fiscalYears', { ...get().fiscalYears.find(y => y.id === id), ...data });
+  },
+  closeFiscalYear: (id) => {
+    set((state) => ({
+      fiscalYears: state.fiscalYears.map(y => y.id === id ? { ...y, isClosed: true, closedAt: new Date().toISOString() } : y),
+    }));
+    const year = get().fiscalYears.find(y => y.id === id);
+    if (year) syncToSupabase('put', 'fiscalYears', { ...year, isClosed: true, closedAt: new Date().toISOString() });
+  },
+  deleteFiscalYear: (id) => {
+    set((state) => ({ fiscalYears: state.fiscalYears.filter(y => y.id !== id) }));
+    syncToSupabase('delete', `fiscalYears/${id}`, {});
+  },
+
+
 }), {
   name: 'mohasebeyad-storage',
   partialize: (state: any) => {

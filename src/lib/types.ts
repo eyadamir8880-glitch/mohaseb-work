@@ -15,23 +15,6 @@ export interface Customer {
   updatedAt: string;
 }
 
-export interface Supplier {
-  id: string;
-  name: string;
-  nameAr: string;
-  phone: string;
-  email: string;
-  address: string;
-  taxNumber: string;
-  paymentTerms: number;
-  notes: string;
-  totalPOs: number;
-  totalPaid: number;
-  balanceDue: number;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export interface Product {
   id: string;
   name: string;
@@ -55,19 +38,6 @@ export interface Product {
   hasVariants: boolean;
   createdAt: string;
   updatedAt: string;
-}
-
-export interface ProductVariant {
-  id: string;
-  productId: string;
-  sku: string;
-  barcode: string;
-  attributeName: string;
-  attributeValue: string;
-  priceOverride: number | null;
-  stock: number;
-  imageUrl: string;
-  createdAt: string;
 }
 
 export interface Category {
@@ -150,57 +120,6 @@ export interface Invoice {
   updatedAt: string;
 }
 
-export interface Quotation {
-  id: string;
-  quotationNumber: string;
-  customerId: string;
-  items: InvoiceItem[];
-  subtotal: number;
-  taxTotal: number;
-  discountTotal: number;
-  grandTotal: number;
-  status: 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired' | 'converted';
-  issueDate: string;
-  expiryDate: string;
-  notes: string;
-  terms: string;
-  convertedInvoiceId: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface PurchaseOrderItem {
-  id: string;
-  productId: string;
-  variantId: string | null;
-  productName: string;
-  productNameAr: string;
-  sku: string;
-  orderedQuantity: number;
-  receivedQuantity: number;
-  unitPrice: number;
-  lineTotal: number;
-}
-
-export interface PurchaseOrder {
-  id: string;
-  poNumber: string;
-  supplierId: string;
-  items: PurchaseOrderItem[];
-  subtotal: number;
-  taxTotal: number;
-  grandTotal: number;
-  paidAmount: number;
-  status: 'draft' | 'sent' | 'partially_received' | 'received' | 'paid' | 'cancelled';
-  orderDate: string;
-  expectedDate: string;
-  receivedDate: string | null;
-  notes: string;
-  treasuryTransactionId: string | null;
-  createdAt: string;
-  updatedAt: string;
-}
-
 export interface ReturnItem {
   id: string;
   productId: string;
@@ -220,7 +139,6 @@ export interface Return {
   returnNumber: string;
   type: 'customer' | 'supplier';
   originalInvoiceId: string | null;
-  originalPOId: string | null;
   items: ReturnItem[];
   refundAmount: number;
   refundMethod: string;
@@ -255,7 +173,7 @@ export interface TreasuryTransaction {
   referenceNumber: string;
   receiptUrl: string;
   linkedInvoiceId: string | null;
-  linkedPOId: string | null;
+  linkedPOId: string | null | undefined;
   linkedReturnId: string | null;
   isRecurring: boolean;
   recurringPattern: string | null;
@@ -286,91 +204,6 @@ export interface Warehouse {
   nameAr: string;
   location: string;
   isDefault: boolean;
-  createdAt: string;
-}
-
-export interface Employee {
-  id: string;
-  name: string;
-  nameAr: string;
-  position: string;
-  positionAr: string;
-  phone: string;
-  email: string;
-  address: string;
-  joinDate: string;
-  baseSalary: number;
-  allowances: number;
-  deductions: number;
-  netSalary: number;
-  status: 'active' | 'on_leave' | 'terminated';
-  notes: string;
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface PayrollRecord {
-  id: string;
-  employeeId: string;
-  month: number;
-  year: number;
-  baseSalary: number;
-  allowances: number;
-  deductions: number;
-  netSalary: number;
-  paymentDate: string | null;
-  treasuryTransactionId: string | null;
-  status: 'pending' | 'paid';
-  createdAt: string;
-}
-
-export interface JournalLine {
-  id: string;
-  journalEntryId: string;
-  accountId: string;
-  debit: number;
-  credit: number;
-  description: string;
-  descriptionAr: string;
-}
-
-export interface JournalEntry {
-  id: string;
-  date: string;
-  referenceNumber: string;
-  description: string;
-  descriptionAr: string;
-  lines: JournalLine[];
-  totalDebit: number;
-  totalCredit: number;
-  attachments: string[];
-  createdAt: string;
-}
-
-export interface DepreciationRecord {
-  id: string;
-  assetId: string;
-  date: string;
-  amount: number;
-  accumulatedDepreciation: number;
-  bookValue: number;
-}
-
-export interface Asset {
-  id: string;
-  name: string;
-  nameAr: string;
-  category: string;
-  purchaseDate: string;
-  purchaseCost: number;
-  salvageValue: number;
-  usefulLife: number;
-  depreciationMethod: 'straight_line' | 'declining_balance';
-  currentBookValue: number;
-  status: 'active' | 'disposed';
-  disposalDate: string | null;
-  disposalPrice: number | null;
-  depreciationRecords: DepreciationRecord[];
   createdAt: string;
 }
 
@@ -462,29 +295,6 @@ export interface PaymentMethod {
   sortOrder: number;
 }
 
-export interface ExternalPurchase {
-  id: string;
-  no: number;
-  photo: string;
-  note: string;
-  nameAr: string;
-  partNum: string;
-  description: string;
-  brand: string;
-  unit: string;
-  quantity: number;
-  costPrice: number;
-  totalCostPrice: number;
-  itemNo: string;
-  weight: number;
-  totalWeight: number;
-  sellPrice: number;
-  totalSellPrice: number;
-  productId: string | null;
-  importSessionId: string | null;
-  createdAt: string;
-}
-
 export interface CustomerStatement {
   id: string;
   customerId: string;
@@ -513,22 +323,14 @@ export interface AppState {
   
   // Data modules
   customers: Customer[];
-  suppliers: Supplier[];
   products: Product[];
-  variants: ProductVariant[];
   categories: Category[];
   invoices: Invoice[];
-  quotations: Quotation[];
-  purchaseOrders: PurchaseOrder[];
   returns: Return[];
   treasuryAccounts: TreasuryAccount[];
   treasuryTransactions: TreasuryTransaction[];
   warehouses: Warehouse[];
   stockMovements: StockMovement[];
-  employees: Employee[];
-  payrollRecords: PayrollRecord[];
-  assets: Asset[];
-  journalEntries: JournalEntry[];
   chartOfAccounts: ChartOfAccount[];
   notifications: Notification[];
   auditLogs: AuditLog[];
@@ -570,6 +372,17 @@ export interface ImportRow {
   errors: { field: string; message: string; severity: 'error' | 'warning' }[];
   isValid: boolean;
   isSelected: boolean;
+}
+
+export interface FiscalYear {
+  id: string;
+  name: string;
+  nameAr: string;
+  startDate: string;
+  endDate: string;
+  isClosed: boolean;
+  closedAt: string | null;
+  createdAt: string;
 }
 
 export type PageWithId = {

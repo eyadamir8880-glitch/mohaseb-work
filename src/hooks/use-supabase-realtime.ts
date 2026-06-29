@@ -8,22 +8,14 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 
 const TABLE_MODULE_MAP: Record<string, string> = {
   customers: 'customers',
-  suppliers: 'suppliers',
   products: 'products',
-  product_variants: 'variants',
   categories: 'categories',
   invoices: 'invoices',
-  quotations: 'quotations',
-  purchase_orders: 'purchaseOrders',
   returns: 'returns',
   treasury_accounts: 'treasuryAccounts',
   treasury_transactions: 'treasuryTransactions',
   warehouses: 'warehouses',
   stock_movements: 'stockMovements',
-  employees: 'employees',
-  payroll_records: 'payrollRecords',
-  assets: 'assets',
-  journal_entries: 'journalEntries',
   chart_of_accounts: 'chartOfAccounts',
   notifications: 'notifications',
   audit_logs: 'auditLogs',
@@ -31,24 +23,20 @@ const TABLE_MODULE_MAP: Record<string, string> = {
   import_sessions: 'importHistory',
   discount_rules: 'discountRules',
   payment_methods: 'paymentMethods',
-  external_purchases: 'externalPurchases',
   customer_statements: 'customerStatements',
   invoice_items: 'invoiceItems',
   invoice_payments: 'payments',
-  quotation_items: 'quotationItems',
-  purchase_order_items: 'purchaseOrderItems',
   return_items: 'returnItems',
   deliveries: 'deliveries',
 };
 
 const POLL_MODULES = [
-  'customers', 'suppliers', 'products', 'variants', 'categories',
-  'invoices', 'quotations', 'purchaseOrders', 'returns',
+  'customers', 'products', 'categories',
+  'invoices', 'returns',
   'treasuryAccounts', 'treasuryTransactions', 'warehouses',
-  'stockMovements', 'employees', 'payrollRecords', 'assets',
-  'journalEntries', 'chartOfAccounts', 'notifications', 'auditLogs',
+  'stockMovements', 'chartOfAccounts', 'notifications', 'auditLogs',
   'settings', 'importHistory', 'discountRules', 'paymentMethods',
-  'externalPurchases', 'customerStatements',
+  'customerStatements',
 ];
 
 export function useSupabaseRealtime() {
@@ -73,7 +61,7 @@ export function useSupabaseRealtime() {
         async (payload) => {
           const table = payload.table as string;
           const module = TABLE_MODULE_MAP[table];
-          if (!module || module === 'invoiceItems' || module === 'quotationItems' || module === 'purchaseOrderItems' || module === 'returnItems' || module === 'deliveries') return;
+          if (!module || module === 'invoiceItems' || module === 'returnItems' || module === 'deliveries') return;
 
           if ((payload as any).event_type === 'DELETE') {
             const recordId = (payload as any).old?.id;

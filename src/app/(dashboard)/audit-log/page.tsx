@@ -91,11 +91,8 @@ export default function AuditLogPage() {
           options={[
             { value: '', label: 'Module...' },
             { value: 'customers', label: 'Customers' },
-            { value: 'suppliers', label: 'Suppliers' },
             { value: 'products', label: 'Products' },
             { value: 'invoices', label: 'Invoices' },
-            { value: 'quotations', label: 'Quotations' },
-            { value: 'purchaseOrders', label: 'Purchase Orders' },
             { value: 'treasury', label: 'Treasury' },
             { value: 'journalEntries', label: 'Journal Entries' },
           ]} className="max-w-[180px]" />

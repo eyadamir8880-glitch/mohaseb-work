@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Select } from '@/components/ui/select';
 import { Modal } from '@/components/ui/modal';
-import { formatCurrency, formatDate, getStatusColor, generateId, generateNumber } from '@/lib/utils';
+import { formatCurrency, formatDate, getStatusColor, generateId, generateNumber, downloadAsExcel } from '@/lib/utils';
 import { Plus, Search, Eye, Trash2, Wallet, Receipt, X } from 'lucide-react';
 import { PAYMENT_METHODS } from '@/lib/constants';
 import type { Invoice, InvoiceItem, Customer, Product } from '@/lib/types';
@@ -226,6 +226,23 @@ export default function InvoicesPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">{t.invoices.title}</h1>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={() => {
+            const exportData = invoices.map(inv => ({
+              [t.invoices.invoiceNumber]: inv.invoiceNumber,
+              [t.app.date]: formatDate(inv.issueDate),
+              [t.customers.name]: customers.find(c => c.id === inv.customerId)?.name || '',
+              [t.invoices.total]: inv.grandTotal,
+              [t.invoices.paid]: inv.paidAmount,
+              [t.invoices.balance]: inv.grandTotal - inv.paidAmount,
+              [t.app.status]: inv.status,
+            }));
+            downloadAsExcel(exportData, `invoices-export-${Date.now()}`);
+          }} className="gap-2">
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            {t('reports.exportExcel')}
+          </Button>
           <Button variant="outline" onClick={() => setShowDeleteAll(true)} className="gap-2 text-red-600 border-red-300 hover:bg-red-50 dark:hover:bg-red-950">
             <Trash2 className="h-4 w-4" />
             {t('app.deleteAll')}

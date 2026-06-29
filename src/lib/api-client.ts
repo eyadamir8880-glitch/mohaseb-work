@@ -45,17 +45,10 @@ function camelToSnake(obj: any): any {
 
 const endpointToTable: Record<string, string> = {
   'customers': 'customers',
-  'suppliers': 'suppliers',
   'products': 'products',
-   'variants': 'product_variants',
   'categories': 'categories',
   'invoices': 'invoices',
   'invoice-items': 'invoice_items',
-  'quotations': 'quotations',
-  'quotation-items': 'quotation_items',
-  'purchase-orders': 'purchase_orders',
-  'purchase-order-items': 'purchase_order_items',
-  'purchaseOrders': 'purchase_orders',
   'returns': 'returns',
   'return-items': 'return_items',
   'returnItems': 'return_items',
@@ -66,10 +59,6 @@ const endpointToTable: Record<string, string> = {
   'warehouses': 'warehouses',
   'stock-movements': 'stock_movements',
   'stockMovements': 'stock_movements',
-  'employees': 'employees',
-  'assets': 'assets',
-  'journal-entries': 'journal_entries',
-  'journalEntries': 'journal_entries',
   'chart-of-accounts': 'chart_of_accounts',
   'chartOfAccounts': 'chart_of_accounts',
   'invoicePayments': 'invoice_payments',
@@ -84,14 +73,12 @@ const endpointToTable: Record<string, string> = {
   'discountRules': 'discount_rules',
   'payment-methods': 'payment_methods',
   'paymentMethods': 'payment_methods',
-  'payroll-records': 'payroll_records',
-  'payrollRecords': 'payroll_records',
   'deliveries': 'deliveries',
   'pricing-rules': 'pricing_rules',
-  'externalPurchases': 'external_purchases',
-  'external-purchases': 'external_purchases',
   'customerStatements': 'customer_statements',
   'customer-statements': 'customer_statements',
+  'fiscal-years': 'fiscal_years',
+  'fiscalYears': 'fiscal_years',
   'productCategories': 'categories',
   'treasuryCategories': 'categories',
 };
@@ -427,25 +414,16 @@ function handleGetRequest<T>(endpoint: string, params?: Record<string, any>): T 
   switch (module) {
     case 'customers':
       return filterData(mockDb.customers, params) as any;
-    case 'suppliers':
-      return filterData(mockDb.suppliers, params) as any;
     case 'products':
       return filterData(mockDb.products, params) as any;
     case 'productCategories':
       return filterData(mockDb.categories.filter((c: any) => c.type === 'product'), params) as any;
     case 'treasuryCategories':
       return filterData(mockDb.categories.filter((c: any) => c.type === 'income' || c.type === 'expense'), params) as any;
-    case 'variants':
-      return filterData(mockDb.variants, params) as any;
     case 'categories':
       return filterData(mockDb.categories, params) as any;
     case 'invoices':
       return filterData(mockDb.invoices, params) as any;
-    case 'quotations':
-      return filterData(mockDb.quotations, params) as any;
-    case 'purchase-orders':
-    case 'purchaseOrders':
-      return filterData(mockDb.purchaseOrders, params) as any;
     case 'returns':
       return filterData(mockDb.returns, params) as any;
     case 'treasury-accounts':
@@ -459,13 +437,6 @@ function handleGetRequest<T>(endpoint: string, params?: Record<string, any>): T 
     case 'stock-movements':
     case 'stockMovements':
       return filterData(mockDb.stockMovements, params) as any;
-    case 'employees':
-      return filterData(mockDb.employees, params) as any;
-    case 'assets':
-      return filterData(mockDb.assets, params) as any;
-    case 'journal-entries':
-    case 'journalEntries':
-      return filterData(mockDb.journalEntries, params) as any;
     case 'chart-of-accounts':
     case 'chartOfAccounts':
       return filterData(mockDb.chartOfAccounts, params) as any;
@@ -485,12 +456,12 @@ function handleGetRequest<T>(endpoint: string, params?: Record<string, any>): T 
     case 'payment-methods':
     case 'paymentMethods':
       return filterData(mockDb.paymentMethods, params) as any;
-    case 'externalPurchases':
-    case 'external-purchases':
-      return filterData(mockDb.externalPurchases, params) as any;
     case 'customerStatements':
     case 'customer-statements':
       return filterData(mockDb.customerStatements, params) as any;
+    case 'fiscal-years':
+    case 'fiscalYears':
+      return filterData(mockDb.fiscalYears || [], params) as any;
     case 'dashboard':
       return getDashboardData() as any;
     default:
@@ -510,18 +481,16 @@ function handlePostRequest<T>(endpoint: string, data: any): T {
 
   switch (module) {
     case 'customers': mockDb.customers.unshift(item); break;
-    case 'suppliers': mockDb.suppliers.unshift(item); break;
     case 'products': mockDb.products.unshift(item); break;
-    case 'variants': mockDb.variants.unshift(item); break;
     case 'categories': mockDb.categories.unshift(item); break;
     case 'invoices': mockDb.invoices.unshift(item); break;
-    case 'quotations': mockDb.quotations.unshift(item); break;
-    case 'purchase-orders':
-    case 'purchaseOrders': mockDb.purchaseOrders.unshift({...item, items: data.items || []}); break;
-    case 'externalPurchases':
-    case 'external-purchases': mockDb.externalPurchases.unshift(item); break;
     case 'customerStatements':
     case 'customer-statements': mockDb.customerStatements.unshift(item); break;
+    case 'fiscal-years':
+    case 'fiscalYears':
+      if (!mockDb.fiscalYears) mockDb.fiscalYears = [];
+      mockDb.fiscalYears.unshift(item);
+      break;
     case 'returns': mockDb.returns.unshift(item); break;
     case 'treasury-accounts':
     case 'treasuryAccounts': mockDb.treasuryAccounts.unshift(item); break;
@@ -530,10 +499,6 @@ function handlePostRequest<T>(endpoint: string, data: any): T {
     case 'warehouses': mockDb.warehouses.unshift(item); break;
     case 'stock-movements':
     case 'stockMovements': mockDb.stockMovements.unshift(item); break;
-    case 'employees': mockDb.employees.unshift(item); break;
-    case 'assets': mockDb.assets.unshift(item); break;
-    case 'journal-entries':
-    case 'journalEntries': mockDb.journalEntries.unshift(item); break;
     case 'chart-of-accounts':
     case 'chartOfAccounts': mockDb.chartOfAccounts.unshift(item); break;
   }
@@ -559,26 +524,22 @@ function handlePutRequest<T>(endpoint: string, data: any): T {
   let updated;
   switch (module) {
     case 'customers': updated = updateCollection(mockDb.customers); break;
-    case 'suppliers': updated = updateCollection(mockDb.suppliers); break;
     case 'products': updated = updateCollection(mockDb.products); break;
-    case 'variants': updated = updateCollection(mockDb.variants); break;
     case 'categories': updated = updateCollection(mockDb.categories); break;
     case 'invoices': updated = updateCollection(mockDb.invoices); break;
-    case 'quotations': updated = updateCollection(mockDb.quotations); break;
-    case 'purchase-orders':
-    case 'purchaseOrders': updated = updateCollection(mockDb.purchaseOrders); break;
     case 'returns': updated = updateCollection(mockDb.returns); break;
     case 'treasury-accounts':
     case 'treasuryAccounts': updated = updateCollection(mockDb.treasuryAccounts); break;
     case 'treasury-transactions':
     case 'treasuryTransactions': updated = updateCollection(mockDb.treasuryTransactions); break;
     case 'warehouses': updated = updateCollection(mockDb.warehouses); break;
-    case 'employees': updated = updateCollection(mockDb.employees); break;
-    case 'assets': updated = updateCollection(mockDb.assets); break;
-    case 'journal-entries':
-    case 'journalEntries': updated = updateCollection(mockDb.journalEntries); break;
     case 'chart-of-accounts':
     case 'chartOfAccounts': updated = updateCollection(mockDb.chartOfAccounts); break;
+    case 'fiscal-years':
+    case 'fiscalYears':
+      if (!mockDb.fiscalYears) mockDb.fiscalYears = [];
+      updated = updateCollection(mockDb.fiscalYears);
+      break;
     default: updated = data;
   }
 
@@ -605,16 +566,13 @@ function handleDeleteRequest<T>(endpoint: string): T {
   let deleted;
   switch (module) {
     case 'customers': deleted = deleteFromCollection(mockDb.customers); break;
-    case 'suppliers': deleted = deleteFromCollection(mockDb.suppliers); break;
     case 'products': deleted = deleteFromCollection(mockDb.products); break;
-    case 'variants': deleted = deleteFromCollection(mockDb.variants); break;
     case 'categories': deleted = deleteFromCollection(mockDb.categories); break;
     case 'invoices': deleted = deleteFromCollection(mockDb.invoices); break;
-    case 'quotations': deleted = deleteFromCollection(mockDb.quotations); break;
-    case 'purchase-orders':
-    case 'purchaseOrders': deleted = deleteFromCollection(mockDb.purchaseOrders); break;
-    case 'externalPurchases':
-    case 'external-purchases': deleted = deleteFromCollection(mockDb.externalPurchases); break;
+    case 'fiscal-years':
+    case 'fiscalYears':
+      if (mockDb.fiscalYears) deleted = deleteFromCollection(mockDb.fiscalYears);
+      break;
   }
 
   if (deleted) {

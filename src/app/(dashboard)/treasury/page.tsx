@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useLanguage } from '@/providers/language-provider';
 import { useAppStore } from '@/stores/use-app-store';
 import { formatCurrency, formatDate } from '@/lib/utils';
@@ -25,6 +25,10 @@ export default function TreasuryPage() {
     return result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [treasuryTransactions, typeFilter]);
 
+  useEffect(() => {
+    store.checkRecurringTransactions();
+  }, []);
+
   const columns = [
     { key: 'date', header: t('invoices.issueDate'), render: (item: any) => formatDate(item.date) },
     { key: 'type', header: t('app.type'), render: (item: any) => (
@@ -32,11 +36,15 @@ export default function TreasuryPage() {
         {item.type === 'income' ? t('treasury.income') : item.type === 'expense' ? t('treasury.expense') : t('treasury.transfer')}
       </span>
     )},
-    { key: 'amount', header: t('invoices.total'), render: (item: any) => (
-      <span className={item.type === 'income' ? 'text-emerald-600' : 'text-red-600'}>
-        {item.type === 'income' ? '+' : '-'}{formatCurrency(item.amount, 'EGP', language)}
-      </span>
-    ), sortable: true },
+    { key: 'amount', header: t('invoices.total'), render: (item: any) => {
+      const acc = treasuryAccounts.find(a => a.id === item.accountId);
+      const currency = acc?.currency || 'EGP';
+      return (
+        <span className={item.type === 'income' ? 'text-emerald-600' : 'text-red-600'}>
+          {item.type === 'income' ? '+' : '-'}{formatCurrency(item.amount, currency, language)}
+        </span>
+      );
+    }, sortable: true },
     { key: 'paymentMethod', header: t('treasury.paymentMethod'), render: (item: any) => {
       const pm = store.paymentMethods.find(p => p.id === item.paymentMethod);
       return pm ? (language === 'ar' ? pm.nameAr : pm.name) : item.paymentMethod;
@@ -46,6 +54,26 @@ export default function TreasuryPage() {
       const acc = treasuryAccounts.find(a => a.id === item.accountId);
       return acc ? (language === 'ar' ? acc.nameAr : acc.name) : '-';
     }},
+    { key: 'reconciled', header: t('treasury.reconciled'), render: (item: any) => (
+      <button
+        onClick={() => store.updateTreasuryTransaction(item.id, {
+          isReconciled: !item.isReconciled,
+          reconciledAt: !item.isReconciled ? new Date().toISOString() : null,
+        })}
+        className={`btn-ghost btn-sm px-2 py-0.5 text-xs rounded ${item.isReconciled ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950' : 'text-slate-400'}`}
+      >
+        {item.isReconciled ? t('treasury.reconciled') : t('treasury.reconcile')}
+      </button>
+    )},
+    { key: 'recurring', header: t('treasury.recurring'), render: (item: any) => item.isRecurring ? (
+      <span className="text-xs text-blue-600 font-medium">
+        {item.recurringPattern === 'daily' ? t('treasury.everyDay')
+          : item.recurringPattern === 'weekly' ? t('treasury.everyWeek')
+          : item.recurringPattern === 'monthly' ? t('treasury.everyMonth')
+          : item.recurringPattern === 'yearly' ? t('treasury.everyYear')
+          : item.recurringPattern}
+      </span>
+    ) : '-'},
   ];
 
   const handleDeleteAll = () => {
@@ -79,7 +107,8 @@ export default function TreasuryPage() {
         {treasuryAccounts.map(acc => (
           <div key={acc.id} className="kpi-card">
             <p className="kpi-label">{language === 'ar' ? acc.nameAr : acc.name}</p>
-            <p className="kpi-value">{formatCurrency(acc.balance, 'EGP', language)}</p>
+            <p className="kpi-value">{formatCurrency(acc.balance, acc.currency || 'EGP', language)}</p>
+            <p className="text-xs text-slate-400 mt-1">{acc.currency || 'EGP'} - {acc.type}</p>
           </div>
         ))}
       </div>
@@ -139,6 +168,8 @@ function TransactionForm({ onSave, onCancel }: { onSave: () => void; onCancel: (
   const [paymentMethod, setPaymentMethod] = useState(store.paymentMethods[0]?.id || 'cash');
   const [description, setDescription] = useState('');
   const [descriptionAr, setDescriptionAr] = useState('');
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurringPattern, setRecurringPattern] = useState('monthly');
 
   const numAmount = parseFloat(amount) || 0;
   const isValid = numAmount > 0 && accountId && (type !== 'transfer' || toAccountId);
@@ -156,7 +187,7 @@ function TransactionForm({ onSave, onCancel }: { onSave: () => void; onCancel: (
       categoryId: '', description, descriptionAr,
       referenceNumber: '', receiptUrl: '',
       linkedInvoiceId: null, linkedPOId: null, linkedReturnId: null,
-      isRecurring: false, recurringPattern: null, nextOccurrence: null,
+      isRecurring, recurringPattern: isRecurring ? recurringPattern : null, nextOccurrence: isRecurring ? date : null,
       isReconciled: false, reconciledAt: null,
     });
 
@@ -211,6 +242,22 @@ function TransactionForm({ onSave, onCancel }: { onSave: () => void; onCancel: (
             <Input label={t('treasury.description') + ' (EN)'} value={description} onChange={(e) => setDescription(e.target.value)} />
             <Input label={t('treasury.description') + ' (AR)'} value={descriptionAr} onChange={(e) => setDescriptionAr(e.target.value)} />
           </>
+        )}
+      </div>
+
+      <div className="flex items-center gap-3">
+        <label className="flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" checked={isRecurring} onChange={(e) => setIsRecurring(e.target.checked)} className="h-4 w-4 rounded border-slate-300" />
+          <span className="text-sm font-medium">{t('treasury.recurring')}</span>
+        </label>
+        {isRecurring && (
+          <Select value={recurringPattern} onChange={(e) => setRecurringPattern(e.target.value)}
+            options={[
+              { value: 'daily', label: t('treasury.everyDay') },
+              { value: 'weekly', label: t('treasury.everyWeek') },
+              { value: 'monthly', label: t('treasury.everyMonth') },
+              { value: 'yearly', label: t('treasury.everyYear') },
+            ]} className="w-40" />
         )}
       </div>
 
