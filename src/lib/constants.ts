@@ -78,10 +78,10 @@ export const LOW_STOCK_COLORS = {
 };
 
 export const MODULES = [
-  'products', 'customers', 'suppliers', 'invoices', 'quotations',
-  'purchaseOrders', 'returns', 'treasury', 'stock', 'employees',
-  'assets', 'journalEntries', 'settings', 'variants', 'warehouses',
-  'stockMovements', 'payrollRecords', 'notifications', 'auditLogs',
-  'importHistory', 'discountRules', 'paymentMethods', 'chartOfAccounts',
-  'externalPurchases', 'customerStatements'
+  'products', 'customers', 'invoices',
+  'returns', 'warehouses', 'treasury', 'stock',
+  'stockMovements', 'notifications', 'auditLogs',
+  'settings', 'chartOfAccounts',
+  'importHistory', 'discountRules', 'paymentMethods',
+  'customerStatements'
 ];
