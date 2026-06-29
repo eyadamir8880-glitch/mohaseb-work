@@ -58,7 +58,7 @@ export function useSupabaseRealtime() {
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastPollRef = useRef<Record<string, { id: string | null; createdAt: string | null }>>({});
   const pollCountRef = useRef(0);
-  const knownSupabaseIds = useRef<Record<string, Set<string>>>({});
+  const pollTimestamps = useRef<Record<string, number>>({});
 
   useEffect(() => {
     if (!isSupabaseConfigured || !isInitialized) return;
@@ -126,17 +126,19 @@ export function useSupabaseRealtime() {
           const currentData = useAppStore.getState() as any;
           const localData: any[] = currentData[module] || [];
           const supabaseIds = new Set(supabaseData.map((r: any) => r.id));
-          const knownIds = knownSupabaseIds.current[module];
-          knownSupabaseIds.current[module] = supabaseIds;
           const onlyLocal = localData.filter((r: any) => !supabaseIds.has(r.id));
-          if (onlyLocal.length > 0 && knownIds) {
-            const trulyLocal = onlyLocal.filter((r: any) => !knownIds.has(r.id));
+          if (onlyLocal.length > 0) {
+            const now = Date.now();
+            const lastPoll = pollTimestamps.current[module] || 0;
+            const trulyLocal = onlyLocal.filter((r: any) => {
+              const age = now - new Date(r.createdAt || r.updatedAt || now).getTime();
+              return age < 10000;
+            });
             useAppStore.setState({ [module]: [...trulyLocal, ...supabaseData] });
-          } else if (onlyLocal.length > 0) {
-            useAppStore.setState({ [module]: [...onlyLocal, ...supabaseData] });
           } else {
             useAppStore.setState({ [module]: supabaseData });
           }
+          pollTimestamps.current[module] = Date.now();
         };
 
         if (isFullCycle) {
@@ -209,7 +211,7 @@ export function useSupabaseRealtime() {
       }
       lastPollRef.current = {};
       pollCountRef.current = 0;
-      knownSupabaseIds.current = {};
+      pollTimestamps.current = {};
       document.removeEventListener('visibilitychange', onVisibility);
     };
   }, [isInitialized]);
