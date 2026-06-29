@@ -63,7 +63,7 @@ export function useSupabaseRealtime() {
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastPollRef = useRef<Record<string, { id: string | null; createdAt: string | null }>>({});
   const pollCountRef = useRef(0);
-  const recentDeletions = useRef<Record<string, number>>({});
+  const knownSupabaseIds = useRef<Record<string, Set<string>>>({});
 
   useEffect(() => {
     if (!isSupabaseConfigured || !isInitialized) return;
@@ -83,7 +83,6 @@ export function useSupabaseRealtime() {
           if ((payload as any).event_type === 'DELETE') {
             const recordId = (payload as any).old?.id;
             if (recordId) {
-              recentDeletions.current[module] = Date.now();
               useAppStore.setState((state: any) => {
                 const arr = state[module];
                 if (!Array.isArray(arr)) return {};
@@ -132,10 +131,12 @@ export function useSupabaseRealtime() {
           const currentData = useAppStore.getState() as any;
           const localData: any[] = currentData[module] || [];
           const supabaseIds = new Set(supabaseData.map((r: any) => r.id));
+          const knownIds = knownSupabaseIds.current[module];
+          knownSupabaseIds.current[module] = supabaseIds;
           const onlyLocal = localData.filter((r: any) => !supabaseIds.has(r.id));
-          const lastDelete = recentDeletions.current[module];
-          if (lastDelete && Date.now() - lastDelete < 60000) {
-            useAppStore.setState({ [module]: supabaseData });
+          if (onlyLocal.length > 0 && knownIds) {
+            const trulyLocal = onlyLocal.filter((r: any) => !knownIds.has(r.id));
+            useAppStore.setState({ [module]: [...trulyLocal, ...supabaseData] });
           } else if (onlyLocal.length > 0) {
             useAppStore.setState({ [module]: [...onlyLocal, ...supabaseData] });
           } else {
@@ -213,6 +214,7 @@ export function useSupabaseRealtime() {
       }
       lastPollRef.current = {};
       pollCountRef.current = 0;
+      knownSupabaseIds.current = {};
       document.removeEventListener('visibilitychange', onVisibility);
     };
   }, [isInitialized]);
