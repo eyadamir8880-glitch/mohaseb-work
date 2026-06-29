@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { DataTable } from '@/components/ui/data-table';
 import { ASSET_CATEGORIES } from '@/lib/constants';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { Trash2 } from 'lucide-react';
 
 export default function AssetsPage() {
@@ -20,6 +21,7 @@ export default function AssetsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showDepreciation, setShowDepreciation] = useState<string | null>(null);
   const [showDeleteAll, setShowDeleteAll] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const columns = [
     { key: 'name', header: t('assets.name'), sortable: true, render: (item: any) => language === 'ar' ? item.nameAr || item.name : item.name },
@@ -47,7 +49,7 @@ export default function AssetsPage() {
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
           </svg>
         </button>
-        <button className="btn-ghost btn-sm p-1 text-red-600" onClick={() => { if (confirm(t('app.deleteConfirm'))) deleteAsset(item.id); }}>
+        <button className="btn-ghost btn-sm p-1 text-red-600" onClick={() => setDeleteConfirmId(item.id)}>
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
           </svg>
@@ -73,13 +75,13 @@ export default function AssetsPage() {
             {t('app.deleteAll')}
           </Button>
           <Button onClick={() => { setEditingId(null); setShowModal(true); }}>
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-          </svg>
-          {t('assets.addNew')}
-        </Button>
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+            {t('assets.addNew')}
+          </Button>
+        </div>
       </div>
-    </div>
       <DataTable columns={columns} data={assets} emptyMessage={t('app.noData')} />
 
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={editingId ? t('assets.editAsset') : t('assets.addNew')}>
@@ -134,6 +136,16 @@ export default function AssetsPage() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={deleteConfirmId !== null}
+        onClose={() => setDeleteConfirmId(null)}
+        onConfirm={() => { deleteAsset(deleteConfirmId!); }}
+        title={t('app.deleteConfirm')}
+        message={t('app.deleteConfirm')}
+        confirmLabel={t('app.yesDelete')}
+        cancelLabel={t('app.cancel')}
+      />
     </div>
   );
 }
@@ -189,7 +201,7 @@ function AssetForm({ assetId, onSave, onCancel }: { assetId: string | null; onSa
       </div>
       <div className="rounded-lg border p-3 text-sm dark:border-slate-700">
         <p>{t('assets.currentBookValue')}: <strong>{formatCurrency(currentBookValue, 'EGP', language)}</strong></p>
-        <p className="text-xs text-slate-500">{t('assets.depreciationMethod')}: {annualDepreciation.toFixed(2)}/year</p>
+        <p className="text-xs text-slate-500">{t('assets.depreciationMethod')}: {formatCurrency(annualDepreciation, 'EGP', language)}/year</p>
       </div>
       <div className="flex justify-end gap-2">
         <Button variant="outline" onClick={onCancel}>{t('app.cancel')}</Button>

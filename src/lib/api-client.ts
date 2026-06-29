@@ -57,6 +57,8 @@ const endpointToTable: Record<string, string> = {
   'purchase-order-items': 'purchase_order_items',
   'purchaseOrders': 'purchase_orders',
   'returns': 'returns',
+  'return-items': 'return_items',
+  'returnItems': 'return_items',
   'treasury-accounts': 'treasury_accounts',
   'treasuryAccounts': 'treasury_accounts',
   'treasury-transactions': 'treasury_transactions',
@@ -71,6 +73,7 @@ const endpointToTable: Record<string, string> = {
   'chart-of-accounts': 'chart_of_accounts',
   'chartOfAccounts': 'chart_of_accounts',
   'invoicePayments': 'invoice_payments',
+  'invoice-payments': 'invoice_payments',
   'notifications': 'notifications',
   'audit-logs': 'audit_logs',
   'auditLogs': 'audit_logs',
@@ -130,7 +133,8 @@ async function supabaseGet<T>(endpoint: string, params?: Record<string, any>): P
 
   if (params) {
     if (params.search) {
-      query = query.or(`name.ilike.%${params.search}%,name_ar.ilike.%${params.search}%,sku.ilike.%${params.search}%,description.ilike.%${params.search}%`);
+      const safe = params.search.replace(/[%_]/g, '\\$&').replace(/['"]/g, '').trim();
+      query = query.or(`name.ilike.%${safe}%,name_ar.ilike.%${safe}%,sku.ilike.%${safe}%,description.ilike.%${safe}%`);
     }
     if (params.status) query = query.eq('status', params.status);
     if (params.categoryId) query = query.eq('category_id', params.categoryId);
@@ -255,28 +259,48 @@ export const apiClient = {
           return responseInterceptor({ data: data as any, status: 200, message: 'Updated successfully' });
         }
 
-        const { data: oldData } = await (getSupabase() as any).from(table).select('*').eq('id', id).single();
+        const { data: oldDataArr } = await (getSupabase() as any).from(table).select('*').eq('id', id);
+        const oldData = oldDataArr?.[0] || null;
 
-        const { data: updated, error } = await (getSupabase() as any)
-          .from(table)
-          .update(camelToSnake(data))
-          .eq('id', id)
-          .select()
-          .single();
-        if (error) throw { code: 'SUPABASE_ERROR', message: error.message };
+        let resultData: any;
+        if (!oldData) {
+          const { data: inserted, error: insertError } = await (getSupabase() as any).from(table).upsert(camelToSnake(data), { onConflict: 'id', ignoreDuplicates: false }).select().maybeSingle();
+          if (insertError) throw { code: 'SUPABASE_ERROR', message: insertError.message };
+          resultData = inserted;
 
-        await (getSupabase() as any).from('audit_logs').insert({
-          timestamp: new Date().toISOString(),
-          user: 'Admin',
-          action: 'updated',
-          module: table,
-          record_id: id,
-          old_values: oldData || null,
-          new_values: camelToSnake(data),
-          ip: '',
-        });
+          await (getSupabase() as any).from('audit_logs').insert({
+            timestamp: new Date().toISOString(),
+            user: 'Admin',
+            action: 'created',
+            module: table,
+            record_id: id,
+            old_values: null,
+            new_values: camelToSnake(data),
+            ip: '',
+          });
+        } else {
+          const { data: updated, error } = await (getSupabase() as any)
+            .from(table)
+            .update(camelToSnake(data))
+            .eq('id', id)
+            .select()
+            .maybeSingle();
+          if (error) throw { code: 'SUPABASE_ERROR', message: error.message };
+          resultData = updated;
 
-        return responseInterceptor({ data: snakeToCamel(updated), status: 200, message: 'Updated successfully' });
+          await (getSupabase() as any).from('audit_logs').insert({
+            timestamp: new Date().toISOString(),
+            user: 'Admin',
+            action: 'updated',
+            module: table,
+            record_id: id,
+            old_values: oldData,
+            new_values: camelToSnake(data),
+            ip: '',
+          });
+        }
+
+        return responseInterceptor({ data: snakeToCamel(resultData), status: 200, message: 'Updated successfully' });
       } catch (err: any) {
         throw errorInterceptor({ code: err.code || 'SERVER_ERROR', message: err.message || 'Failed to update' });
       }
@@ -299,21 +323,24 @@ export const apiClient = {
           return responseInterceptor({ data: null as any, status: 200, message: 'Deleted successfully' });
         }
 
-        const { data: oldData } = await (getSupabase() as any).from(table).select('*').eq('id', id).single();
+        const { data: oldDataArr } = await (getSupabase() as any).from(table).select('*').eq('id', id);
+        const oldData = oldDataArr?.[0] || null;
 
-        const { error } = await (getSupabase() as any).from(table).delete().eq('id', id);
-        if (error) throw { code: 'SUPABASE_ERROR', message: error.message };
+        if (oldData) {
+          const { error } = await (getSupabase() as any).from(table).delete().eq('id', id);
+          if (error) throw { code: 'SUPABASE_ERROR', message: error.message };
 
-        await (getSupabase() as any).from('audit_logs').insert({
-          timestamp: new Date().toISOString(),
-          user: 'Admin',
-          action: 'deleted',
-          module: table,
-          record_id: id,
-          old_values: oldData || null,
-          new_values: null,
-          ip: '',
-        });
+          await (getSupabase() as any).from('audit_logs').insert({
+            timestamp: new Date().toISOString(),
+            user: 'Admin',
+            action: 'deleted',
+            module: table,
+            record_id: id,
+            old_values: oldData,
+            new_values: null,
+            ip: '',
+          });
+        }
 
         return responseInterceptor({ data: snakeToCamel(oldData), status: 200, message: 'Deleted successfully' });
       } catch (err: any) {
@@ -349,6 +376,14 @@ export const apiClient = {
     return responseInterceptor({ data: result, status: 201, message: 'Uploaded successfully' });
   },
 };
+
+export async function batchDeleteFromSupabase(tableEndpoint: string, ids: string[]) {
+  if (!isSupabaseConfigured || ids.length === 0) return;
+  const table = getTable(tableEndpoint);
+  if (!table) return;
+  const { error } = await (getSupabase() as any).from(table).delete().in('id', ids);
+  if (error) console.error(`Batch delete from ${table} failed:`, error);
+}
 
 async function supabaseGetDashboard(): Promise<any> {
   try { getSupabase(); } catch { return {}; }

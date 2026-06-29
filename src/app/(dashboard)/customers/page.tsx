@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import { Input } from '@/components/ui/input';
 import { DataTable } from '@/components/ui/data-table';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { Trash2 } from 'lucide-react';
 
 export default function CustomersPage() {
@@ -18,6 +19,7 @@ export default function CustomersPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showDeleteAll, setShowDeleteAll] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     let result = [...customers];
@@ -50,7 +52,7 @@ export default function CustomersPage() {
             <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
           </svg>
         </button>
-        <button className="btn-ghost btn-sm p-1 text-red-600" onClick={() => { if (confirm(t('app.deleteConfirm'))) deleteCustomer(item.id); }}>
+        <button className="btn-ghost btn-sm p-1 text-red-600" onClick={() => setDeleteConfirmId(item.id)}>
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
           </svg>
@@ -105,6 +107,16 @@ export default function CustomersPage() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={deleteConfirmId !== null}
+        onClose={() => setDeleteConfirmId(null)}
+        onConfirm={() => { deleteCustomer(deleteConfirmId!); }}
+        title={t('app.deleteConfirm')}
+        message={t('app.deleteConfirm')}
+        confirmLabel={t('app.yesDelete')}
+        cancelLabel={t('app.cancel')}
+      />
     </div>
   );
 }
@@ -121,7 +133,7 @@ function CustomerForm({ customerId, onSave, onCancel }: { customerId: string | n
   const [creditLimit, setCreditLimit] = useState(String(existing?.creditLimit || 0));
 
   const handleSave = () => {
-    const data = { name, nameAr: name, phone, email, address, taxNumber, creditLimit: parseFloat(creditLimit), totalInvoiced: existing?.totalInvoiced || 0, totalPaid: existing?.totalPaid || 0, totalDue: existing?.totalDue || 0, customPricingRules: existing?.customPricingRules || [] };
+    const data = { name, nameAr: name, phone, email, address, taxNumber, creditLimit: parseFloat(creditLimit) || 0, totalInvoiced: existing?.totalInvoiced || 0, totalPaid: existing?.totalPaid || 0, totalDue: existing?.totalDue || 0, customPricingRules: existing?.customPricingRules || [] };
     if (existing) {
       store.updateCustomer(existing.id, data);
     } else {

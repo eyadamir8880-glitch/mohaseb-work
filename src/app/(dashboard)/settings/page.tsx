@@ -17,6 +17,7 @@ export default function SettingsPage() {
   const store = useAppStore();
   const [newPmName, setNewPmName] = useState('');
   const [newPmType, setNewPmType] = useState<'vodafone_cash' | 'instapay' | 'cash' | 'bank' | 'card' | 'check'>('vodafone_cash');
+  const [importError, setImportError] = useState('');
 
   const handleSaveSession = () => {
     const snapshot = store.getStateSnapshot();
@@ -40,8 +41,8 @@ export default function SettingsPage() {
         const data = JSON.parse(text);
         const success = store.loadState(data);
         if (success) store.addNotification({ type: 'system', title: 'Session Loaded', titleAr: 'تم تحميل الجلسة', message: 'Session loaded successfully', messageAr: 'تم تحميل الجلسة بنجاح', module: 'settings', recordId: '', isRead: false, readAt: null });
-        else alert(t('common.invalidBackup').replace('{module}', 'unknown'));
-      } catch (err) { alert('Failed to load: ' + (err as Error).message); }
+        else setImportError(t('common.invalidBackup').replace('{module}', 'unknown'));
+      } catch (err) { setImportError('Failed to load: ' + (err as Error).message); }
     };
     input.click();
   };
@@ -50,10 +51,10 @@ export default function SettingsPage() {
     downloadAsJson(store.getStateSnapshot(), `mohasebeyad-full-export-${new Date().toISOString().split('T')[0]}.json`);
   };
 
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+
   const handleResetData = () => {
-    if (confirm('Reset all data to demo? This will delete all changes.')) {
-      store.resetToDemo();
-    }
+    setShowResetConfirm(true);
   };
 
   const getSetting = (key: string) => {
@@ -209,5 +210,29 @@ export default function SettingsPage() {
         </TabsContent>
       </Tabs>
     </div>
+
+      {showResetConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black/50" onClick={() => setShowResetConfirm(false)} />
+          <div className="relative bg-background rounded-lg shadow-xl w-full max-w-sm mx-4 p-6">
+            <h2 className="text-lg font-semibold mb-2">{t('settings.confirmResetTitle') || 'Reset Data'}</h2>
+            <p className="text-sm text-muted-foreground mb-4">{t('settings.confirmResetMessage') || 'Reset all data to demo? This will delete all changes.'}</p>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowResetConfirm(false)}>{t('app.cancel')}</Button>
+              <Button variant="danger" onClick={() => { store.resetToDemo(); setShowResetConfirm(false); }}>{t('app.yesDelete')}</Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {importError && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black/50" onClick={() => setImportError('')} />
+          <div className="relative bg-background rounded-lg shadow-xl w-full max-w-sm mx-4 p-6 text-center">
+            <p className="text-red-600 font-semibold mb-4">{importError}</p>
+            <Button onClick={() => setImportError('')}>{t('app.ok')}</Button>
+          </div>
+        </div>
+      )}
   );
 }

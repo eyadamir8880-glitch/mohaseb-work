@@ -6,6 +6,7 @@ import { useAppStore } from '@/stores/use-app-store';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency, generateId, readFileAsArrayBuffer } from '@/lib/utils';
 import { Plus, Search, Edit, Trash2, Package, AlertTriangle, Upload } from 'lucide-react';
@@ -242,16 +243,15 @@ export default function ProductsPage() {
             className="pl-9"
           />
         </div>
-        <select
+        <Select
           value={catFilter}
           onChange={(e) => setCatFilter(e.target.value)}
-          className="input w-48"
-        >
-          <option value="all">{t('app.all')}</option>
-          {productCategories.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
-          ))}
-        </select>
+          className="w-48"
+          options={[
+            { value: 'all', label: t('app.all') },
+            ...productCategories.map((c) => ({ value: c.id, label: c.name })),
+          ]}
+        />
       </div>
 
       <Card>
@@ -333,14 +333,8 @@ export default function ProductsPage() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <Input label={t('products.name')} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-              <div>
-                <label className="label">SKU</label>
-                <Input value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} />
-              </div>
-              <div>
-                <label className="label">{t('products.barcode')}</label>
-                <Input value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} />
-              </div>
+              <Input label="SKU" value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} />
+              <Input label={t('products.barcode')} value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} />
               <div className="col-span-2">
                 <label className="label">{t('products.description')}</label>
                 <textarea
@@ -349,35 +343,16 @@ export default function ProductsPage() {
                   onChange={(e) => setForm({ ...form, description: e.target.value })}
                 />
               </div>
-              <div>
-                <label className="label">{t('app.category')}</label>
-                <select
-                  className="input"
-                  value={form.categoryId}
-                  onChange={(e) => setForm({ ...form, categoryId: e.target.value })}
-                >
-                  <option value="">{t('app.all')}</option>
-                  {productCategories.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="label">{t('products.unit')}</label>
-                <select
-                  className="input"
-                  value={form.unitOfMeasure}
-                  onChange={(e) => setForm({ ...form, unitOfMeasure: e.target.value })}
-                >
-                  <option value="piece">{t('products.unit')}</option>
-                  <option value="box">Box</option>
-                  <option value="meter">Meter</option>
-                  <option value="liter">Liter</option>
-                  <option value="kilogram">Kilogram</option>
-                  <option value="pair">Pair</option>
-                  <option value="dozen">Dozen</option>
-                </select>
-              </div>
+              <Select label={t('app.category')} value={form.categoryId} onChange={(e) => setForm({ ...form, categoryId: e.target.value })}
+                placeholder={t('app.all')}
+                options={productCategories.map((c) => ({ value: c.id, label: c.name }))} />
+              <Select label={t('products.unit')} value={form.unitOfMeasure} onChange={(e) => setForm({ ...form, unitOfMeasure: e.target.value })}
+                options={[
+                  { value: 'piece', label: t('products.unit') },
+                  { value: 'box', label: 'Box' }, { value: 'meter', label: 'Meter' },
+                  { value: 'liter', label: 'Liter' }, { value: 'kilogram', label: 'Kilogram' },
+                  { value: 'pair', label: 'Pair' }, { value: 'dozen', label: 'Dozen' },
+                ]} />
               <div>
                 <label className="label">{t('products.purchasePrice')}</label>
                 <Input

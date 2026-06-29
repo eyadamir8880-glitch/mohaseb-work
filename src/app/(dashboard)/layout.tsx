@@ -13,7 +13,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen" dir={language === 'ar' ? 'rtl' : 'ltr'}>
       <Sidebar />
-      <div className={`flex-1 transition-all duration-200 ${sidebarCollapsed ? 'ml-[70px] mr-0' : 'ml-[260px] mr-0'} ${language === 'ar' ? (sidebarCollapsed ? 'mr-[70px] ml-0' : 'mr-[260px] ml-0') : ''}`}>
+      <div className={`flex-1 transition-all duration-200 ${sidebarCollapsed ? 'ms-[70px]' : 'ms-[260px]'}`}>
         <Header />
         <main className="p-6">
           {children}

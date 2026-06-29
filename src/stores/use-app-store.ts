@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 import { generateMockData } from '@/lib/mock-data';
 import { PAYMENT_METHODS, DEFAULT_SETTINGS } from '@/lib/constants';
 import { generateId } from '@/lib/utils';
-import { apiClient, camelToSnake } from '@/lib/api-client';
+import { apiClient, camelToSnake, batchDeleteFromSupabase } from '@/lib/api-client';
 import { isSupabaseConfigured, getSupabase } from '@/lib/supabase';
 import type {
   Customer, Supplier, Product, ProductVariant, Category,
@@ -320,19 +320,13 @@ export const useAppStore = create<AppStore>()(
     if (hasLocalData) {
       set({ isInitialized: true } as any);
     } else {
-      const data = generateMockData();
-      const settingsArray: Setting[] = Object.entries(DEFAULT_SETTINGS).map(([key, value]) => ({
-        id: generateId(), key, value: String(value), updatedAt: new Date().toISOString(),
-      }));
       set({
-        ...data, settings: settingsArray, paymentMethods: PAYMENT_METHODS,
+        settings: Object.entries(DEFAULT_SETTINGS).map(([key, value]) => ({
+          id: generateId(), key, value: String(value), updatedAt: new Date().toISOString(),
+        })),
+        paymentMethods: PAYMENT_METHODS,
         isInitialized: true,
       } as any);
-      get().addAuditLog({
-        timestamp: new Date().toISOString(), user: 'System', action: 'created',
-        module: 'system', recordId: 'init', oldValues: null,
-        newValues: { action: 'Application initialized with demo data' }, ip: '127.0.0.1',
-      });
     }
   },
 
@@ -405,7 +399,7 @@ export const useAppStore = create<AppStore>()(
           if (data && data.length > 0) {
             try {
               const table = tableMap[m] || m;
-              (supabase as any).from(table).insert(data.map((d: any) => camelToSnake(d))).then(() => {}).catch(() => {});
+              (supabase as any).from(table).insert(data.map((d: any) => camelToSnake(d))).then(() => {}).catch((e: any) => console.error(`Batch insert ${table} failed:`, e));
             } catch {}
           }
         }
@@ -435,7 +429,19 @@ export const useAppStore = create<AppStore>()(
   },
   deleteCustomer: (id) => {
     const old = get().customers.find(c => c.id === id);
-    set((state) => ({ customers: state.customers.filter(c => c.id !== id) }));
+    const state = get();
+    const customerInvoices = state.invoices.filter(i => i.customerId === id);
+    const invoiceIds = customerInvoices.map(i => i.id);
+    const invoiceItemIds = customerInvoices.flatMap(i => (i.items || []).map(item => item.id));
+    const statementIds = (state.customerStatements || []).filter(s => s.customerId === id).map(s => s.id);
+    batchDeleteFromSupabase('invoice-items', invoiceItemIds);
+    batchDeleteFromSupabase('invoices', invoiceIds);
+    batchDeleteFromSupabase('customerStatements', statementIds);
+    set((state) => ({
+      customers: state.customers.filter(c => c.id !== id),
+      invoices: state.invoices.filter(i => i.customerId !== id),
+      customerStatements: (state.customerStatements || []).filter(s => s.customerId !== id),
+    }));
     get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'deleted', module: 'customers', recordId: id, oldValues: old, newValues: null, ip: '' });
     syncToSupabase('delete', 'customers', { id });
   },
@@ -455,7 +461,16 @@ export const useAppStore = create<AppStore>()(
   },
   deleteSupplier: (id) => {
     const old = get().suppliers.find(s => s.id === id);
-    set((state) => ({ suppliers: state.suppliers.filter(s => s.id !== id) }));
+    const state = get();
+    const supplierPOs = state.purchaseOrders.filter(po => po.supplierId === id);
+    const poIds = supplierPOs.map(po => po.id);
+    const poItemIds = supplierPOs.flatMap(po => (po.items || []).map(item => item.id));
+    batchDeleteFromSupabase('purchase-order-items', poItemIds);
+    batchDeleteFromSupabase('purchaseOrders', poIds);
+    set((state) => ({
+      suppliers: state.suppliers.filter(s => s.id !== id),
+      purchaseOrders: state.purchaseOrders.filter(po => po.supplierId !== id),
+    }));
     get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'deleted', module: 'suppliers', recordId: id, oldValues: old, newValues: null, ip: '' });
     syncToSupabase('delete', 'suppliers', { id });
   },
@@ -474,7 +489,7 @@ export const useAppStore = create<AppStore>()(
     if (isSupabaseConfigured) {
       try {
         const supabase = getSupabase();
-        (supabase as any).from('products').insert(products.map(p => camelToSnake(p))).then(() => {}).catch(() => {});
+        (supabase as any).from('products').insert(products.map(p => camelToSnake(p))).then(() => {}).catch((e: any) => console.error('Batch insert products failed:', e));
       } catch {}
     }
     return products;
@@ -489,6 +504,13 @@ export const useAppStore = create<AppStore>()(
     const old = get().products.find(p => p.id === id);
     set((state) => ({ products: state.products.filter(p => p.id !== id), variants: state.variants.filter(v => v.productId !== id) }));
     get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'deleted', module: 'products', recordId: id, oldValues: old, newValues: null, ip: '' });
+    const state = get();
+    const invoiceItemIds = state.invoices.flatMap(i => (i.items || []).filter(item => item.productId === id).map(item => item.id));
+    const stockMovementIds = state.stockMovements.filter(m => m.productId === id).map(m => m.id);
+    const returnItemIds = state.returns.flatMap(r => (r.items || []).filter(item => item.productId === id).map(item => item.id));
+    batchDeleteFromSupabase('invoice-items', invoiceItemIds);
+    batchDeleteFromSupabase('stockMovements', stockMovementIds);
+    batchDeleteFromSupabase('returnItems', returnItemIds);
     syncToSupabase('delete', 'products', { id });
   },
 
@@ -528,7 +550,18 @@ export const useAppStore = create<AppStore>()(
     get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'created', module: 'invoices', recordId: invoice.id, oldValues: null, newValues: data, ip: '' });
     const { items, payments, ...invoiceFields } = invoice;
     syncToSupabase('post', 'invoices', invoiceFields);
-    if (items) {
+    if (items && items.length > 0 && isSupabaseConfigured) {
+      const itemsWithInvoice = items.map(item => ({ ...item, invoiceId: invoice.id }));
+      try {
+        const supabase = getSupabase();
+        const { error } = await supabase.from('invoice_items').insert(itemsWithInvoice.map(camelToSnake));
+        if (error) {
+          itemsWithInvoice.forEach(item => syncToSupabase('post', 'invoice-items', item));
+        }
+      } catch {
+        itemsWithInvoice.forEach(item => syncToSupabase('post', 'invoice-items', item));
+      }
+    } else if (items) {
       items.forEach(item => syncToSupabase('post', 'invoice-items', { ...item, invoiceId: invoice.id }));
     }
     if (invoice.customerId && invoice.status !== 'draft') {
@@ -672,7 +705,7 @@ export const useAppStore = create<AppStore>()(
       ),
     }));
     get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'updated', module: 'invoices', recordId: invoiceId, oldValues: null, newValues: { paidAmount: newPaidAmount, status: newStatus }, ip: '' });
-    syncToSupabase('post', 'invoicePayments', { ...paymentData, invoiceId, id: payment.id, createdAt: payment.createdAt });
+    syncToSupabase('post', 'invoice-payments', { ...paymentData, invoiceId, id: payment.id, createdAt: payment.createdAt });
     syncToSupabase('put', 'invoices', { id: invoiceId, paidAmount: newPaidAmount, status: newStatus });
 
     if (wasDraft && invoice.items) {
@@ -747,7 +780,17 @@ export const useAppStore = create<AppStore>()(
     get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'created', module: 'quotations', recordId: quotation.id, oldValues: null, newValues: data, ip: '' });
     const { items, ...quotationFields } = quotation;
     syncToSupabase('post', 'quotations', quotationFields);
-    if (items) {
+    if (items && items.length > 0 && isSupabaseConfigured) {
+      try {
+        const supabase = getSupabase();
+        supabase.from('quotation_items').insert(items.map(item => camelToSnake({ ...item, quotationId: quotation.id }))).then(() => {}).catch((e: any) => {
+          console.error('Batch insert quotation_items failed:', e);
+          items.forEach(item => syncToSupabase('post', 'quotation-items', { ...item, quotationId: quotation.id }));
+        });
+      } catch {
+        items.forEach(item => syncToSupabase('post', 'quotation-items', { ...item, quotationId: quotation.id }));
+      }
+    } else if (items) {
       items.forEach(item => syncToSupabase('post', 'quotation-items', { ...item, quotationId: quotation.id }));
     }
     return quotation;
@@ -771,7 +814,17 @@ export const useAppStore = create<AppStore>()(
     get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'created', module: 'purchaseOrders', recordId: po.id, oldValues: null, newValues: data, ip: '' });
     const { items, ...poFields } = po;
     syncToSupabase('post', 'purchaseOrders', poFields);
-    if (items) {
+    if (items && items.length > 0 && isSupabaseConfigured) {
+      try {
+        const supabase = getSupabase();
+        supabase.from('purchase_order_items').insert(items.map(item => camelToSnake({ ...item, purchaseOrderId: po.id }))).then(() => {}).catch((e: any) => {
+          console.error('Batch insert purchase_order_items failed:', e);
+          items.forEach(item => syncToSupabase('post', 'purchase-order-items', { ...item, purchaseOrderId: po.id }));
+        });
+      } catch {
+        items.forEach(item => syncToSupabase('post', 'purchase-order-items', { ...item, purchaseOrderId: po.id }));
+      }
+    } else if (items) {
       items.forEach(item => syncToSupabase('post', 'purchase-order-items', { ...item, purchaseOrderId: po.id }));
     }
     return po;
@@ -1022,13 +1075,19 @@ export const useAppStore = create<AppStore>()(
   },
   markAllNotificationsRead: () => {
     set((state) => ({ notifications: state.notifications.map(n => ({ ...n, isRead: true, readAt: new Date().toISOString() })) }));
-    const ids = get().notifications.map(n => n.id);
-    ids.forEach(id => syncToSupabase('put', 'notifications', { id, isRead: true, readAt: new Date().toISOString() }));
+    const unread = get().notifications.filter(n => !n.isRead).map(n => n.id);
+    if (isSupabaseConfigured && unread.length > 0) {
+      try {
+        const supabase = getSupabase();
+        supabase.from('notifications').update({ is_read: true, read_at: new Date().toISOString() }).in('id', unread).then(() => {}).catch((e: any) => console.error('Batch mark notifications read failed:', e));
+      } catch {}
+    }
+    set((state) => ({ notifications: state.notifications.map(n => n.isRead ? n : { ...n, isRead: true, readAt: new Date().toISOString() }) }));
   },
   clearNotifications: () => {
-    const oldNotifications = [...get().notifications];
+    const ids = get().notifications.map(n => n.id);
     set({ notifications: [] });
-    oldNotifications.forEach(n => syncToSupabase('delete', 'notifications', { id: n.id }));
+    batchDeleteFromSupabase('notifications', ids);
   },
 
   addAuditLog: (data) => {
@@ -1072,7 +1131,7 @@ export const useAppStore = create<AppStore>()(
     get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'deleted', module, recordId: 'all', oldValues: null, newValues: null, ip: '' });
     if (isSupabaseConfigured) {
       try {
-        oldData.forEach((item: any) => syncToSupabase('delete', module, { id: item.id }));
+        batchDeleteFromSupabase(module, oldData.map((item: any) => item.id));
       } catch {}
     }
   },
@@ -1115,7 +1174,7 @@ export const useAppStore = create<AppStore>()(
     set((state) => ({ externalPurchases: [...purchases, ...state.externalPurchases] }));
     get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'created', module: 'externalPurchases', recordId: `${purchases.length} bulk`, oldValues: null, newValues: { count: purchases.length }, ip: '' });
     if (isSupabaseConfigured) {
-      try { (getSupabase() as any).from('external_purchases').insert(purchases.map(p => camelToSnake(p))).then(() => {}).catch(() => {}); } catch {}
+      try { (getSupabase() as any).from('external_purchases').insert(purchases.map(p => camelToSnake(p))).then(() => {}).catch((e: any) => console.error('Batch insert external purchases failed:', e)); } catch {}
     }
     return purchases;
   },

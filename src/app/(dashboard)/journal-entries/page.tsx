@@ -9,6 +9,7 @@ import { Modal } from '@/components/ui/modal';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { DataTable } from '@/components/ui/data-table';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { Trash2 } from 'lucide-react';
 
 export default function JournalEntriesPage() {
@@ -19,6 +20,7 @@ export default function JournalEntriesPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAccounts, setShowAccounts] = useState(false);
   const [showDeleteAll, setShowDeleteAll] = useState(false);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const columns = [
     { key: 'date', header: t('journal.date'), render: (item: any) => formatDate(item.date) },
@@ -33,7 +35,7 @@ export default function JournalEntriesPage() {
             <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
           </svg>
         </button>
-        <button className="btn-ghost btn-sm p-1 text-red-600" onClick={() => { if (confirm(t('app.deleteConfirm'))) store.deleteJournalEntry(item.id); }}>
+        <button className="btn-ghost btn-sm p-1 text-red-600" onClick={() => setDeleteConfirmId(item.id)}>
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
           </svg>
@@ -90,6 +92,16 @@ export default function JournalEntriesPage() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={deleteConfirmId !== null}
+        onClose={() => setDeleteConfirmId(null)}
+        onConfirm={() => { store.deleteJournalEntry(deleteConfirmId!); }}
+        title={t('app.deleteConfirm')}
+        message={t('app.deleteConfirm')}
+        confirmLabel={t('app.yesDelete')}
+        cancelLabel={t('app.cancel')}
+      />
     </div>
   );
 }
@@ -136,8 +148,8 @@ function JournalEntryForm({ entryId, onSave, onCancel }: { entryId: string | nul
       <div className="grid grid-cols-2 gap-4">
         <Input label={t('journal.date')} type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         <Input label={t('journal.referenceNumber')} value={referenceNumber} onChange={(e) => setReferenceNumber(e.target.value)} />
-        <Input label={t('journal.description') + ' (EN)'} value={description} onChange={(e) => setDescription(e.target.value)} />
-        <Input label={t('journal.description') + ' (AR)'} value={descriptionAr} onChange={(e) => setDescriptionAr(e.target.value)} />
+        <Input label={t('journal.description')} value={description} onChange={(e) => setDescription(e.target.value)} />
+        <Input label={t('journal.descriptionAr')} value={descriptionAr} onChange={(e) => setDescriptionAr(e.target.value)} />
       </div>
 
       <div className="space-y-2">
@@ -190,6 +202,7 @@ function ChartOfAccountsForm({ onClose }: { onClose: () => void }) {
   const [newNameAr, setNewNameAr] = useState('');
   const [newCode, setNewCode] = useState('');
   const [newType, setNewType] = useState<'asset' | 'liability' | 'equity' | 'income' | 'expense'>('asset');
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const handleAdd = () => {
     if (!newName || !newCode) return;
@@ -201,8 +214,8 @@ function ChartOfAccountsForm({ onClose }: { onClose: () => void }) {
     <div className="space-y-4">
       <div className="flex gap-2 items-end">
         <Input placeholder={t('journal.accountCode')} value={newCode} onChange={(e) => setNewCode(e.target.value)} className="w-24" />
-        <Input placeholder={t('journal.account') + ' (EN)'} value={newName} onChange={(e) => setNewName(e.target.value)} />
-        <Input placeholder={t('journal.account') + ' (AR)'} value={newNameAr} onChange={(e) => setNewNameAr(e.target.value)} />
+        <Input placeholder={t('journal.account')} value={newName} onChange={(e) => setNewName(e.target.value)} />
+        <Input placeholder={t('journal.accountAr')} value={newNameAr} onChange={(e) => setNewNameAr(e.target.value)} />
         <Select value={newType} onChange={(e) => setNewType(e.target.value as any)}
           options={[
             { value: 'asset', label: 'Asset' }, { value: 'liability', label: 'Liability' },
@@ -219,7 +232,7 @@ function ChartOfAccountsForm({ onClose }: { onClose: () => void }) {
               <span className="ml-2">{language === 'ar' ? acc.nameAr : acc.name}</span>
               <span className="ml-2 text-xs text-slate-400">({acc.type})</span>
             </div>
-            <button className="btn-ghost p-1 text-red-600" onClick={() => { if (confirm(t('app.deleteConfirm'))) deleteChartOfAccount(acc.id); }}>
+            <button className="btn-ghost p-1 text-red-600" onClick={() => setDeleteConfirmId(acc.id)}>
               <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
               </svg>
@@ -230,6 +243,16 @@ function ChartOfAccountsForm({ onClose }: { onClose: () => void }) {
       <div className="flex justify-end">
         <Button variant="outline" onClick={onClose}>{t('app.close')}</Button>
       </div>
+
+      <ConfirmModal
+        isOpen={deleteConfirmId !== null}
+        onClose={() => setDeleteConfirmId(null)}
+        onConfirm={() => { deleteChartOfAccount(deleteConfirmId!); }}
+        title={t('app.deleteConfirm')}
+        message={t('app.deleteConfirm')}
+        confirmLabel={t('app.yesDelete')}
+        cancelLabel={t('app.cancel')}
+      />
     </div>
   );
 }

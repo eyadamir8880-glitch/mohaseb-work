@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { DataTable } from '@/components/ui/data-table';
 import { readFileAsArrayBuffer } from '@/lib/utils';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 import * as XLSX from 'xlsx';
 
 export default function ExternalPurchasesPage() {
@@ -19,6 +20,7 @@ export default function ExternalPurchasesPage() {
   const [brandFilter, setBrandFilter] = useState('');
   const [showImportModal, setShowImportModal] = useState(false);
   const [importResult, setImportResult] = useState<{ imported: number; skipped: number; warnings: string[] } | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const brands = useMemo(() => {
     const set = new Set(externalPurchases.map(p => p.brand).filter(Boolean));
@@ -80,9 +82,7 @@ export default function ExternalPurchasesPage() {
         : <span className="badge badge-yellow text-xs">{t('externalPurchases.skipped')}</span>
     )},
     { key: 'actions', header: t('app.actions'), render: (item: any) => (
-      <button className="btn-ghost btn-sm p-1 text-red-600" onClick={() => {
-        if (confirm(t('externalPurchases.deleteConfirm'))) store.deleteExternalPurchase(item.id);
-      }}>
+      <button className="btn-ghost btn-sm p-1 text-red-600" onClick={() => setDeleteConfirmId(item.id)}>
         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
         </svg>
@@ -197,6 +197,16 @@ export default function ExternalPurchasesPage() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={deleteConfirmId !== null}
+        onClose={() => setDeleteConfirmId(null)}
+        onConfirm={() => { store.deleteExternalPurchase(deleteConfirmId!); }}
+        title={t('app.deleteConfirm')}
+        message={t('app.deleteConfirm')}
+        confirmLabel={t('app.yesDelete')}
+        cancelLabel={t('app.cancel')}
+      />
     </div>
   );
 }

@@ -9,6 +9,7 @@ import { Modal } from '@/components/ui/modal';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { DataTable } from '@/components/ui/data-table';
+import { ConfirmModal } from '@/components/ui/confirm-modal';
 import { Trash2 } from 'lucide-react';
 
 export default function EmployeesPage() {
@@ -21,6 +22,8 @@ export default function EmployeesPage() {
   const [payrollMonth, setPayrollMonth] = useState(new Date().getMonth() + 1);
   const [payrollYear, setPayrollYear] = useState(new Date().getFullYear());
   const [showDeleteAll, setShowDeleteAll] = useState(false);
+  const [payrollMessage, setPayrollMessage] = useState('');
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
 
   const columns = [
     { key: 'name', header: t('employees.name'), sortable: true, render: (item: any) => language === 'ar' ? item.nameAr || item.name : item.name },
@@ -41,7 +44,7 @@ export default function EmployeesPage() {
             <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
           </svg>
         </button>
-        <button className="btn-ghost btn-sm p-1 text-red-600" onClick={() => { if (confirm(t('app.deleteConfirm'))) store.deleteEmployee(item.id); }}>
+        <button className="btn-ghost btn-sm p-1 text-red-600" onClick={() => setDeleteConfirmId(item.id)}>
           <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
           </svg>
@@ -72,7 +75,7 @@ export default function EmployeesPage() {
         });
       }
     });
-    alert(`Payroll processed for ${activeEmps.length} employees`);
+    setPayrollMessage(`Payroll processed for ${activeEmps.length} employees`);
   };
 
   const handleDeleteAll = () => {
@@ -112,8 +115,8 @@ export default function EmployeesPage() {
       <Modal isOpen={showPayroll} onClose={() => setShowPayroll(false)} title={t('employees.processPayroll')}>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <Input label={t('employees.month')} type="number" min="1" max="12" value={payrollMonth} onChange={(e) => setPayrollMonth(parseInt(e.target.value))} />
-            <Input label={t('employees.year')} type="number" value={payrollYear} onChange={(e) => setPayrollYear(parseInt(e.target.value))} />
+            <Input label={t('employees.month')} type="number" min="1" max="12" value={payrollMonth} onChange={(e) => setPayrollMonth(parseInt(e.target.value) || 0)} />
+            <Input label={t('employees.year')} type="number" value={payrollYear} onChange={(e) => setPayrollYear(parseInt(e.target.value) || 0)} />
           </div>
           <p className="text-sm text-slate-500">
             {employees.filter(e => e.status === 'active').length} {t('employees.active')} employees will be processed.
@@ -126,6 +129,15 @@ export default function EmployeesPage() {
         </div>
       </Modal>
 
+      {payrollMessage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black/50" onClick={() => setPayrollMessage('')} />
+          <div className="relative bg-background rounded-lg shadow-xl w-full max-w-sm mx-4 p-6 text-center">
+            <p className="text-green-600 font-semibold mb-4">{payrollMessage}</p>
+            <Button onClick={() => setPayrollMessage('')}>{t('app.ok')}</Button>
+          </div>
+        </div>
+      )}
       {showDeleteAll && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="fixed inset-0 bg-black/50" onClick={() => setShowDeleteAll(false)} />
@@ -139,6 +151,16 @@ export default function EmployeesPage() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={deleteConfirmId !== null}
+        onClose={() => setDeleteConfirmId(null)}
+        onConfirm={() => { store.deleteEmployee(deleteConfirmId!); }}
+        title={t('app.deleteConfirm')}
+        message={t('app.deleteConfirm')}
+        confirmLabel={t('app.yesDelete')}
+        cancelLabel={t('app.cancel')}
+      />
     </div>
   );
 }
@@ -159,10 +181,13 @@ function EmployeeForm({ employeeId, onSave, onCancel }: { employeeId: string | n
   const [status, setStatus] = useState(existing?.status || 'active');
   const [notes, setNotes] = useState(existing?.notes || '');
 
-  const netSalary = parseFloat(baseSalary) + parseFloat(allowances) - parseFloat(deductions);
+  const bs = parseFloat(baseSalary) || 0;
+  const al = parseFloat(allowances) || 0;
+  const dd = parseFloat(deductions) || 0;
+  const netSalary = bs + al - dd;
 
   const handleSave = () => {
-    const data = { name, nameAr: name, position, positionAr: position, phone, email, address, joinDate, baseSalary: parseFloat(baseSalary), allowances: parseFloat(allowances), deductions: parseFloat(deductions), netSalary, status: status as any, notes };
+    const data = { name, nameAr: name, position, positionAr: position, phone, email, address, joinDate, baseSalary: bs, allowances: al, deductions: dd, netSalary, status: status as any, notes };
     if (existing) {
       store.updateEmployee(existing.id, data);
     } else {
@@ -185,7 +210,7 @@ function EmployeeForm({ employeeId, onSave, onCancel }: { employeeId: string | n
         <Input label={t('employees.deductions')} type="number" value={deductions} onChange={(e) => setDeductions(e.target.value)} />
         <div>
           <label className="label">{t('employees.netSalary')}</label>
-          <div className="input mt-1 bg-slate-50 dark:bg-slate-700">{formatCurrency(netSalary, 'EGP', 'en')}</div>
+          <div className="input mt-1 bg-slate-50 dark:bg-slate-700">{formatCurrency(netSalary, 'EGP', language)}</div>
         </div>
         <Select label={t('app.status')} value={status} onChange={(e) => setStatus(e.target.value as 'active' | 'on_leave' | 'terminated')}
           options={[

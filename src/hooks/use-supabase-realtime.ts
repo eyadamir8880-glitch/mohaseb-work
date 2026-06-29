@@ -51,6 +51,11 @@ const POLL_MODULES = [
   'externalPurchases', 'customerStatements',
 ];
 
+const MODULE_TO_TABLE: Record<string, string> = {};
+for (const [table, module] of Object.entries(TABLE_MODULE_MAP)) {
+  MODULE_TO_TABLE[module] = table;
+}
+
 export function useSupabaseRealtime() {
   const isInitialized = useAppStore((s) => s.isInitialized);
   const channelRef = useRef<RealtimeChannel | null>(null);
@@ -58,6 +63,7 @@ export function useSupabaseRealtime() {
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const lastPollRef = useRef<Record<string, { id: string | null; createdAt: string | null }>>({});
   const pollCountRef = useRef(0);
+  const recentDeletions = useRef<Record<string, number>>({});
 
   useEffect(() => {
     if (!isSupabaseConfigured || !isInitialized) return;
@@ -74,6 +80,19 @@ export function useSupabaseRealtime() {
           const module = TABLE_MODULE_MAP[table];
           if (!module || module === 'invoiceItems' || module === 'quotationItems' || module === 'purchaseOrderItems' || module === 'returnItems' || module === 'deliveries') return;
 
+          if ((payload as any).event_type === 'DELETE') {
+            const recordId = (payload as any).old?.id;
+            if (recordId) {
+              recentDeletions.current[module] = Date.now();
+              useAppStore.setState((state: any) => {
+                const arr = state[module];
+                if (!Array.isArray(arr)) return {};
+                return { [module]: arr.filter((r: any) => r.id !== recordId) };
+              });
+            }
+            return;
+          }
+
           if (debounceRef.current[module]) {
             clearTimeout(debounceRef.current[module]);
           }
@@ -82,15 +101,7 @@ export function useSupabaseRealtime() {
             try {
               const res = await apiClient.get<any[]>(module);
               if (res.data) {
-                const currentData = useAppStore.getState() as any;
-                const localData: any[] = currentData[module] || [];
-                const localIds = new Set(localData.map((r: any) => r.id));
-                const onlyLocal = localData.filter((r: any) => !res.data.some((s: any) => s.id === r.id));
-                if (onlyLocal.length > 0) {
-                  useAppStore.setState({ [module]: [...onlyLocal, ...res.data] });
-                } else {
-                  useAppStore.setState({ [module]: res.data });
-                }
+                await mergeWithLocal(module, res.data);
               }
             } catch (err) {
               console.error(`Realtime refetch failed for ${module}:`, err);
@@ -120,10 +131,12 @@ export function useSupabaseRealtime() {
         const mergeWithLocal = (module: string, supabaseData: any[]) => {
           const currentData = useAppStore.getState() as any;
           const localData: any[] = currentData[module] || [];
-          const localIds = new Set(localData.map((r: any) => r.id));
           const supabaseIds = new Set(supabaseData.map((r: any) => r.id));
           const onlyLocal = localData.filter((r: any) => !supabaseIds.has(r.id));
-          if (onlyLocal.length > 0) {
+          const lastDelete = recentDeletions.current[module];
+          if (lastDelete && Date.now() - lastDelete < 60000) {
+            useAppStore.setState({ [module]: supabaseData });
+          } else if (onlyLocal.length > 0) {
             useAppStore.setState({ [module]: [...onlyLocal, ...supabaseData] });
           } else {
             useAppStore.setState({ [module]: supabaseData });
@@ -131,41 +144,43 @@ export function useSupabaseRealtime() {
         };
 
         if (isFullCycle) {
-          for (const module of POLL_MODULES) {
-            try {
-              const res = await apiClient.get<any[]>(module);
-              if (res.data) {
-                mergeWithLocal(module, res.data);
-              }
-            } catch {}
+          const results = await Promise.all(
+            POLL_MODULES.map((module) =>
+              apiClient.get<any[]>(module).then(res => ({ module, data: res.data })).catch(() => ({ module, data: null }))
+            )
+          );
+          for (const { module, data } of results) {
+            if (data) await mergeWithLocal(module, data);
           }
           return;
         }
 
-        for (const module of POLL_MODULES) {
-          try {
-            const res = await apiClient.get<any[]>(module, { limit: 1 });
-            const state = lastPollRef.current[module];
-            if (res.data && res.data.length > 0) {
-              const record = res.data[0];
-              const changed = !state || state.id === null || state.id !== record.id || state.createdAt !== record.createdAt;
-              if (changed) {
-                const full = await apiClient.get<any[]>(module);
-                if (full.data) {
-                  mergeWithLocal(module, full.data);
-                }
-              }
-              lastPollRef.current[module] = { id: record.id, createdAt: record.createdAt };
-            } else {
-              if (state && state.id !== null) {
-                const full = await apiClient.get<any[]>(module);
-                if (full.data) {
-                  mergeWithLocal(module, full.data);
-                }
-              }
-              lastPollRef.current[module] = { id: null, createdAt: null };
-            }
-          } catch {}
+        const checkResults = await Promise.all(
+          POLL_MODULES.map((module) =>
+            apiClient.get<any[]>(module, { limit: 1 }).then(res => ({ module, data: res.data })).catch(() => ({ module, data: null }))
+          )
+        );
+        const changedModules = checkResults.filter(({ module, data }) => {
+          const state = lastPollRef.current[module];
+          if (data && data.length > 0) {
+            const record = data[0];
+            const changed = !state || state.id === null || state.id !== record.id || state.createdAt !== record.createdAt;
+            lastPollRef.current[module] = { id: record.id, createdAt: record.createdAt };
+            return changed;
+          }
+          const wasDeleted = state && state.id !== null;
+          lastPollRef.current[module] = { id: null, createdAt: null };
+          return wasDeleted;
+        });
+        if (changedModules.length > 0) {
+          const fullResults = await Promise.all(
+            changedModules.map(({ module }) =>
+              apiClient.get<any[]>(module).then(res => ({ module, data: res.data })).catch(() => ({ module, data: null }))
+            )
+          );
+          for (const { module, data } of fullResults) {
+            if (data) await mergeWithLocal(module, data);
+          }
         }
       }, 5000);
     };
@@ -188,11 +203,16 @@ export function useSupabaseRealtime() {
     return () => {
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
       }
       Object.values(debounceRef.current).forEach(clearTimeout);
+      debounceRef.current = {};
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
       }
+      lastPollRef.current = {};
+      pollCountRef.current = 0;
       document.removeEventListener('visibilitychange', onVisibility);
     };
   }, [isInitialized]);

@@ -37,7 +37,7 @@ export default function DashboardPage() {
       outstandingInvoices: outstandingAmt,
       currentBalance,
     };
-  }, [transactions, invoices]);
+    }, [transactions, invoices, treasuryAccounts]);
 
   const monthlyData = useMemo(() => {
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
