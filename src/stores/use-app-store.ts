@@ -690,25 +690,19 @@ export const useAppStore = create<AppStore>()(
       ret.items.forEach((item: ReturnItem) => {
         const product = get().products.find(p => p.id === item.productId);
         if (product) {
-          if (ret.type === 'customer') {
-            // Customer return: restore stock
-            get().updateProduct(product.id, { stock: (product.stock || 0) + item.quantity });
-          } else {
-            // Supplier return: reduce stock
-            get().updateProduct(product.id, { stock: Math.max(0, (product.stock || 0) - item.quantity) });
-          }
+          get().updateProduct(product.id, { stock: (product.stock || 0) + item.quantity });
         }
         get().addStockMovement({
-          productId: item.productId, variantId: item.variantId, type: ret.type === 'customer' ? 'in' : 'out',
-          quantity: item.quantity, reason: `${ret.type === 'customer' ? 'Customer Return' : 'Supplier Return'} - ${ret.returnNumber}`,
+          productId: item.productId, variantId: item.variantId, type: 'in',
+          quantity: item.quantity, reason: `Customer Return - ${ret.returnNumber}`,
           date: new Date().toISOString().split('T')[0],
           referenceType: 'return', referenceId: ret.id, warehouseId: '',
         });
       });
     }
 
-    // Update invoice status for customer returns
-    if (ret.type === 'customer' && ret.originalInvoiceId) {
+    // Update invoice status
+    if (ret.originalInvoiceId) {
       const invoice = get().invoices.find(inv => inv.id === ret.originalInvoiceId);
       if (invoice) {
         const allReturnedItems = ret.items?.length || 0;
@@ -722,7 +716,7 @@ export const useAppStore = create<AppStore>()(
     }
 
     // Customer statement for refund
-    if (ret.type === 'customer' && ret.originalInvoiceId && ret.refundAmount > 0) {
+    if (ret.originalInvoiceId && ret.refundAmount > 0) {
       get().addCustomerStatement({
         customerId: get().invoices.find(inv => inv.id === ret.originalInvoiceId)?.customerId || '',
         date: new Date().toISOString().split('T')[0],
@@ -756,7 +750,7 @@ export const useAppStore = create<AppStore>()(
         categoryId: '', description: `Refund for ${ret.returnNumber}`,
         descriptionAr: `مرتجعات ${ret.returnNumber}`,
         referenceNumber: ret.returnNumber, receiptUrl: '',
-        linkedInvoiceId: ret.type === 'customer' ? ret.originalInvoiceId : null,
+        linkedInvoiceId: ret.originalInvoiceId,
         linkedPOId: null,
         linkedReturnId: ret.id,
         isRecurring: false, recurringPattern: null, nextOccurrence: null,

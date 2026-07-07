@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { useLanguage } from '@/providers/language-provider';
 import { useAppStore } from '@/stores/use-app-store';
 import { formatCurrency, formatDate } from '@/lib/utils';
@@ -24,10 +24,6 @@ export default function TreasuryPage() {
     if (typeFilter) result = result.filter(t => t.type === typeFilter);
     return result.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }, [treasuryTransactions, typeFilter]);
-
-  useEffect(() => {
-    store.checkRecurringTransactions();
-  }, []);
 
   const columns = [
     { key: 'date', header: t('invoices.issueDate'), render: (item: any) => formatDate(item.date) },

@@ -137,7 +137,7 @@ export interface ReturnItem {
 export interface Return {
   id: string;
   returnNumber: string;
-  type: 'customer' | 'supplier';
+  type: 'customer';
   originalInvoiceId: string | null;
   items: ReturnItem[];
   refundAmount: number;
