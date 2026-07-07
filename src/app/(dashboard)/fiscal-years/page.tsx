@@ -129,7 +129,7 @@ export default function FiscalYearsPage() {
         </table>
       </div>
 
-      <Modal open={showModal} onClose={() => setShowModal(false)} title={editingId ? t('fiscalYears.edit') : t('fiscalYears.create')}>
+      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={editingId ? t('fiscalYears.edit') : t('fiscalYears.create')}>
         <div className="space-y-4">
           <Input label={t('fiscalYears.name')} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
           <Input label={t('fiscalYears.nameAr')} value={form.nameAr} onChange={e => setForm(f => ({ ...f, nameAr: e.target.value }))} />
