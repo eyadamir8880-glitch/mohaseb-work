@@ -102,6 +102,25 @@ export function useSupabaseRealtime() {
       lastPollRef.current[m] = { id: null, createdAt: null };
     }
 
+    const mergeWithLocal = (module: string, supabaseData: any[]) => {
+      const currentData = useAppStore.getState() as any;
+      const localData: any[] = currentData[module] || [];
+      const supabaseIds = new Set(supabaseData.map((r: any) => r.id));
+      const onlyLocal = localData.filter((r: any) => !supabaseIds.has(r.id));
+      if (onlyLocal.length > 0) {
+        const now = Date.now();
+        const lastPoll = pollTimestamps.current[module] || 0;
+        const trulyLocal = onlyLocal.filter((r: any) => {
+          const age = now - new Date(r.createdAt || r.updatedAt || now).getTime();
+          return age < 10000;
+        });
+        useAppStore.setState({ [module]: [...trulyLocal, ...supabaseData] });
+      } else {
+        useAppStore.setState({ [module]: supabaseData });
+      }
+      pollTimestamps.current[module] = Date.now();
+    };
+
     // Polling fallback: every 5 seconds check for changes
     // Lightweight check (limit:1, default sort by created_at DESC) every cycle
     // Full refetch every 60 seconds to catch updates and mid-list deletions
@@ -109,25 +128,6 @@ export function useSupabaseRealtime() {
       pollIntervalRef.current = setInterval(async () => {
         pollCountRef.current++;
         const isFullCycle = pollCountRef.current % 12 === 0;
-
-        const mergeWithLocal = (module: string, supabaseData: any[]) => {
-          const currentData = useAppStore.getState() as any;
-          const localData: any[] = currentData[module] || [];
-          const supabaseIds = new Set(supabaseData.map((r: any) => r.id));
-          const onlyLocal = localData.filter((r: any) => !supabaseIds.has(r.id));
-          if (onlyLocal.length > 0) {
-            const now = Date.now();
-            const lastPoll = pollTimestamps.current[module] || 0;
-            const trulyLocal = onlyLocal.filter((r: any) => {
-              const age = now - new Date(r.createdAt || r.updatedAt || now).getTime();
-              return age < 10000;
-            });
-            useAppStore.setState({ [module]: [...trulyLocal, ...supabaseData] });
-          } else {
-            useAppStore.setState({ [module]: supabaseData });
-          }
-          pollTimestamps.current[module] = Date.now();
-        };
 
         if (isFullCycle) {
           const results = await Promise.all(

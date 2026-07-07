@@ -7623,7 +7623,7 @@ export function generateMockData() {
     {
       id: "ea51e0ef-809a-45d7-99f6-684cf07b9f5e",
       returnNumber: "RET-0002",
-      type: "supplier",
+      type: "customer",
       originalInvoiceId: "1201bd49-1d03-4016-991e-03a1e67e0ce4",
 
       items: [
@@ -7662,7 +7662,7 @@ export function generateMockData() {
     {
       id: "b324ce78-806e-4cc6-bdd4-1b8d46003330",
       returnNumber: "RET-0003",
-      type: "supplier",
+      type: "customer",
       originalInvoiceId: "dd094339-7d12-4d96-936b-d330df87b513",
 
       items: [
@@ -7688,7 +7688,7 @@ export function generateMockData() {
     {
       id: "2f72c667-07d5-43b3-bfc5-cf9140ff7517",
       returnNumber: "RET-0004",
-      type: "supplier",
+      type: "customer",
       originalInvoiceId: "6c97544f-effe-4a3b-b3d5-ca22a41df31d",
 
       items: [
@@ -7727,7 +7727,7 @@ export function generateMockData() {
     {
       id: "4b7742b2-2e33-4d74-9238-8fcf895bf2f3",
       returnNumber: "RET-0005",
-      type: "supplier",
+      type: "customer",
       originalInvoiceId: "6c97544f-effe-4a3b-b3d5-ca22a41df31d",
 
       items: [
@@ -7766,7 +7766,7 @@ export function generateMockData() {
     {
       id: "b8f761d3-972c-49ba-b52f-18d982bf714e",
       returnNumber: "RET-0006",
-      type: "supplier",
+      type: "customer",
       originalInvoiceId: "1d7cff6d-73f6-442c-b98d-5c25080e4cf2",
 
       items: [
@@ -7805,7 +7805,7 @@ export function generateMockData() {
     {
       id: "8b3fca0b-b0d7-47b4-b0cb-5dd5a541153d",
       returnNumber: "RET-0007",
-      type: "supplier",
+      type: "customer",
       originalInvoiceId: "d56fd5e4-e178-438e-9775-dea2f0de0820",
 
       items: [
