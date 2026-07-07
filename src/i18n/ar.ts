@@ -375,7 +375,6 @@ const ar = {
     operatingExpenses: 'المصروفات التشغيلية',
     otherIncome: 'إيرادات أخرى',
     otherExpenses: 'مصروفات أخرى',
-    noJournalEntries: 'لا توجد قيود يومية لهذه الفترة',
     reference: 'المرجع',
     debitBalance: 'رصيد مدين',
     creditBalance: 'رصيد دائن',

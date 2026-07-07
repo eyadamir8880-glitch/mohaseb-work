@@ -104,8 +104,6 @@ export default function SettingsPage() {
         <TabsContent value="invoice" className="mt-4 space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <Input label="Invoice Prefix" value={getSetting('invoicePrefix')} onChange={(e) => updateSetting('invoicePrefix', e.target.value)} />
-            <Input label="Quotation Prefix" value={getSetting('quotationPrefix')} onChange={(e) => updateSetting('quotationPrefix', e.target.value)} />
-            <Input label="PO Prefix" value={getSetting('poPrefix')} onChange={(e) => updateSetting('poPrefix', e.target.value)} />
             <Input label="Default Tax Rate (%)" type="number" value={getSetting('defaultTaxRate')} onChange={(e) => updateSetting('defaultTaxRate', e.target.value)} />
           </div>
           <div>

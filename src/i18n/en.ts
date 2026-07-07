@@ -375,7 +375,6 @@ const en = {
     operatingExpenses: 'Operating Expenses',
     otherIncome: 'Other Income',
     otherExpenses: 'Other Expenses',
-    noJournalEntries: 'No journal entries found for this period',
     reference: 'Reference',
     debitBalance: 'Debit Balance',
     creditBalance: 'Credit Balance',

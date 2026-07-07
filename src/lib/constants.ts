@@ -22,14 +22,12 @@ export const DEFAULT_SETTINGS = {
   companyAddressAr: 'القاهرة، مصر',
   companyTaxNumber: '123-456-789',
   invoicePrefix: 'INV-',
-  quotationPrefix: 'QT-',
   returnPrefix: 'RET-',
   defaultCurrency: 'EGP',
   defaultTaxRate: 14,
   invoiceTerms: 'Payment due within 30 days',
   invoiceTermsAr: 'الدفع مستحق خلال 30 يوماً',
-  posReceiptFooter: 'Thank you for your purchase!',
-  posReceiptFooterAr: 'شكراً لتسوقكم!',
+
   defaultWarehouseId: '',
   lowStockThreshold: 10,
   dateFormat: 'DD/MM/YYYY',
@@ -61,14 +59,6 @@ export const UNITS_OF_MEASURE = [
   { value: 'gram', label: 'Gram', labelAr: 'جرام' },
   { value: 'pair', label: 'Pair', labelAr: 'زوج' },
   { value: 'dozen', label: 'Dozen', labelAr: 'دستة' },
-];
-
-export const ASSET_CATEGORIES = [
-  { value: 'equipment', label: 'Equipment', labelAr: 'معدات' },
-  { value: 'vehicle', label: 'Vehicle', labelAr: 'مركبة' },
-  { value: 'computer', label: 'Computer', labelAr: 'حاسوب' },
-  { value: 'furniture', label: 'Furniture', labelAr: 'أثاث' },
-  { value: 'other', label: 'Other', labelAr: 'أخرى' },
 ];
 
 export const LOW_STOCK_COLORS = {
