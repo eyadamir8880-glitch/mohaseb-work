@@ -143,7 +143,7 @@ export default function FiscalYearsPage() {
       </Modal>
 
       <ConfirmModal
-        open={closeConfirmId !== null}
+        isOpen={closeConfirmId !== null}
         onClose={() => setCloseConfirmId(null)}
         onConfirm={() => closeConfirmId && handleClose(closeConfirmId)}
         title={t('fiscalYears.close')}
