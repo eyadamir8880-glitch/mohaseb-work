@@ -64,8 +64,6 @@ export default function ReturnsPage() {
       <DataTable
         columns={columns}
         data={returns.filter(r => r.type === 'customer')}
-        searchable
-        sortable
       />
 
       <Modal isOpen={showDeleteAll} onClose={() => setShowDeleteAll(false)} title={t('app.deleteAllWarning')}>
@@ -127,7 +125,7 @@ function ReturnForm({ onSave, onCancel }: { onSave: () => void; onCancel: () => 
 
     store.addReturn({
       returnNumber: `RET-${String(store.returns.length + 1).padStart(3, '0')}`,
-      type: 'customer', originalInvoiceId, originalPOId: null,
+      type: 'customer', originalInvoiceId,
       items: returnItems, refundAmount: totalRefund, refundMethod: 'cash',
       status: 'completed',
     });

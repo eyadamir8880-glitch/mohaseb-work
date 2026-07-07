@@ -757,7 +757,7 @@ export const useAppStore = create<AppStore>()(
         descriptionAr: `مرتجعات ${ret.returnNumber}`,
         referenceNumber: ret.returnNumber, receiptUrl: '',
         linkedInvoiceId: ret.type === 'customer' ? ret.originalInvoiceId : null,
-        linkedPOId: ret.type === 'supplier' ? ret.originalPOId : null,
+        linkedPOId: null,
         linkedReturnId: ret.id,
         isRecurring: false, recurringPattern: null, nextOccurrence: null,
         isReconciled: false, reconciledAt: null,
