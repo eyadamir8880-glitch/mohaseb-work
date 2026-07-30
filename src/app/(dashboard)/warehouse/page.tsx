@@ -18,7 +18,7 @@ export default function WarehousePage() {
   const sortedMovements = useMemo(() => [...stockMovements].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()), [stockMovements]);
 
   const stats = useMemo(() => {
-    const totalProducts = new Set(products.map(p => p.name.trim().toLowerCase())).size;
+    const totalProducts = products.length;
     const totalValue = products.reduce((s, p) => s + (p.purchasePrice * p.stock), 0);
     const lowStock = products.filter(p => p.trackInventory && p.stock > 0 && p.stock <= p.lowStockThreshold).length;
     const outOfStock = products.filter(p => p.trackInventory && p.stock === 0).length;
