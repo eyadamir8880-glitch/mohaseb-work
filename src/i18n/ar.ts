@@ -232,7 +232,7 @@ const ar = {
     lowStock: 'مخزون منخفض',
     outOfStock: 'نفد من المخزون',
     stockMovements: 'حركات المخزون',
-    totalSKUs: 'إجمالي الأصناف',
+    totalProducts: 'إجمالي المنتجات',
     totalValue: 'القيمة الإجمالية',
   },
 

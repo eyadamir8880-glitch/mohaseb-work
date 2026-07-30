@@ -18,11 +18,11 @@ export default function WarehousePage() {
   const sortedMovements = useMemo(() => [...stockMovements].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()), [stockMovements]);
 
   const stats = useMemo(() => {
-    const totalSKUs = products.length;
+    const totalProducts = new Set(products.map(p => p.name.trim().toLowerCase())).size;
     const totalValue = products.reduce((s, p) => s + (p.purchasePrice * p.stock), 0);
     const lowStock = products.filter(p => p.trackInventory && p.stock > 0 && p.stock <= p.lowStockThreshold).length;
     const outOfStock = products.filter(p => p.trackInventory && p.stock === 0).length;
-    return { totalSKUs, totalValue, lowStock, outOfStock };
+    return { totalProducts, totalValue, lowStock, outOfStock };
   }, [products]);
 
   const getCategoryName = (catId: string) => {
@@ -84,8 +84,8 @@ export default function WarehousePage() {
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="kpi-card">
-          <p className="kpi-label">{t('warehouse.totalSKUs')}</p>
-          <p className="kpi-value">{stats.totalSKUs}</p>
+          <p className="kpi-label">{t('warehouse.totalProducts')}</p>
+          <p className="kpi-value">{stats.totalProducts}</p>
         </div>
         <div className="kpi-card">
           <p className="kpi-label">{t('warehouse.totalValue')}</p>

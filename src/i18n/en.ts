@@ -232,7 +232,7 @@ const en = {
     lowStock: 'Low Stock',
     outOfStock: 'Out of Stock',
     stockMovements: 'Stock Movements',
-    totalSKUs: 'Total SKUs',
+    totalProducts: 'Total Products',
     totalValue: 'Total Value',
   },
 
