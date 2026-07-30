@@ -128,7 +128,7 @@ async function supabaseGet<T>(endpoint: string, params?: Record<string, any>): P
   const tablesWithoutCreatedAt = ['payment_methods', 'import_sessions', 'settings'];
   const hasCreatedAt = !tablesWithoutCreatedAt.includes(table);
 
-  let query = (getSupabase() as any).from(table).select('*');
+  let query = (getSupabase() as any).from(table).select('*', { count: 'exact' });
 
   if (params) {
     if (params.search) {
@@ -154,15 +154,32 @@ async function supabaseGet<T>(endpoint: string, params?: Record<string, any>): P
     } else if (hasCreatedAt) {
       query = query.order('created_at', { ascending: false });
     }
-    if (params.limit) query = query.limit(params.limit);
-    if (params.offset) query = query.range(params.offset, params.offset + (params.limit || 10) - 1);
+    if (params.limit) {
+      query = query.limit(params.limit);
+      if (params.offset) query = query.range(params.offset, params.offset + params.limit - 1);
+      const { data, error } = await query;
+      if (error) throw { code: 'SUPABASE_ERROR', message: error.message };
+      return snakeToCamel(data || []) as any;
+    }
   } else if (hasCreatedAt) {
     query = query.order('created_at', { ascending: false });
   }
 
-  const { data, error } = await query;
+  const PAGE_SIZE = 1000;
+  query = query.limit(PAGE_SIZE);
+  const { data: firstPage, count, error } = await query;
   if (error) throw { code: 'SUPABASE_ERROR', message: error.message };
-  return snakeToCamel(data || []) as any;
+  let allData = firstPage || [];
+  if (count && count > PAGE_SIZE) {
+    const pages = Math.ceil(count / PAGE_SIZE);
+    for (let page = 1; page < pages; page++) {
+      const from = page * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
+      const { data: nextPage } = await (getSupabase() as any).from(table).select('*').range(from, to).limit(PAGE_SIZE);
+      if (nextPage) allData = allData.concat(nextPage);
+    }
+  }
+  return snakeToCamel(allData) as any;
 }
 
 const delay = (ms?: number) => {
