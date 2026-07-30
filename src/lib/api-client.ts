@@ -128,56 +128,60 @@ async function supabaseGet<T>(endpoint: string, params?: Record<string, any>): P
   const tablesWithoutCreatedAt = ['payment_methods', 'import_sessions', 'settings'];
   const hasCreatedAt = !tablesWithoutCreatedAt.includes(table);
 
-  let query = (getSupabase() as any).from(table).select('*', { count: 'exact' });
-
-  if (params) {
-    if (params.search) {
-      const safe = params.search.replace(/[%_]/g, '\\$&').replace(/['"]/g, '').trim();
-      query = query.or(`name.ilike.%${safe}%,name_ar.ilike.%${safe}%,sku.ilike.%${safe}%,description.ilike.%${safe}%`);
-    }
-    if (params.status) query = query.eq('status', params.status);
-    if (params.categoryId) query = query.eq('category_id', params.categoryId);
-    if (params.customerId) query = query.eq('customer_id', params.customerId);
-    if (params.supplierId) query = query.eq('supplier_id', params.supplierId);
-    if (params.dateFrom && hasCreatedAt) query = query.gte('created_at', params.dateFrom);
-    if (params.dateTo && hasCreatedAt) query = query.lte('created_at', params.dateTo);
-    if (params.type) query = query.eq('type', params.type);
-    if (params.productId) query = query.eq('product_id', params.productId);
-    if (params.invoiceId) query = query.eq('invoice_id', params.invoiceId);
-    if (params.accountId) query = query.eq('account_id', params.accountId);
-    if (params.warehouseId) query = query.eq('warehouse_id', params.warehouseId);
-    if (params.employeeId) query = query.eq('employee_id', params.employeeId);
-    if (params.isRead !== undefined) query = query.eq('is_read', params.isRead);
-    if (params.module) query = query.eq('module', params.module);
-    if (params.sortBy) {
-      query = query.order(params.sortBy, { ascending: params.sortOrder === 'asc' });
+  const buildQuery = (rangeFrom?: number, rangeTo?: number) => {
+    let q = (getSupabase() as any).from(table).select('*');
+    if (params) {
+      if (params.search) {
+        const safe = params.search.replace(/[%_]/g, '\\$&').replace(/['"]/g, '').trim();
+        q = q.or(`name.ilike.%${safe}%,name_ar.ilike.%${safe}%,sku.ilike.%${safe}%,description.ilike.%${safe}%`);
+      }
+      if (params.status) q = q.eq('status', params.status);
+      if (params.categoryId) q = q.eq('category_id', params.categoryId);
+      if (params.customerId) q = q.eq('customer_id', params.customerId);
+      if (params.supplierId) q = q.eq('supplier_id', params.supplierId);
+      if (params.dateFrom && hasCreatedAt) q = q.gte('created_at', params.dateFrom);
+      if (params.dateTo && hasCreatedAt) q = q.lte('created_at', params.dateTo);
+      if (params.type) q = q.eq('type', params.type);
+      if (params.productId) q = q.eq('product_id', params.productId);
+      if (params.invoiceId) q = q.eq('invoice_id', params.invoiceId);
+      if (params.accountId) q = q.eq('account_id', params.accountId);
+      if (params.warehouseId) q = q.eq('warehouse_id', params.warehouseId);
+      if (params.employeeId) q = q.eq('employee_id', params.employeeId);
+      if (params.isRead !== undefined) q = q.eq('is_read', params.isRead);
+      if (params.module) q = q.eq('module', params.module);
+      if (params.sortBy) {
+        q = q.order(params.sortBy, { ascending: params.sortOrder === 'asc' });
+      } else if (hasCreatedAt) {
+        q = q.order('created_at', { ascending: false });
+      }
     } else if (hasCreatedAt) {
-      query = query.order('created_at', { ascending: false });
+      q = q.order('created_at', { ascending: false });
     }
-    if (params.limit) {
-      query = query.limit(params.limit);
-      if (params.offset) query = query.range(params.offset, params.offset + params.limit - 1);
-      const { data, error } = await query;
-      if (error) throw { code: 'SUPABASE_ERROR', message: error.message };
-      return snakeToCamel(data || []) as any;
+    if (rangeFrom !== undefined && rangeTo !== undefined) {
+      q = q.range(rangeFrom, rangeTo);
     }
-  } else if (hasCreatedAt) {
-    query = query.order('created_at', { ascending: false });
+    return q;
+  };
+
+  if (params?.limit) {
+    const hasOffset = params.offset !== undefined;
+    const q = hasOffset ? buildQuery(params.offset, params.offset + params.limit - 1) : buildQuery();
+    const { data, error } = await q.limit(params.limit);
+    if (error) throw { code: 'SUPABASE_ERROR', message: error.message };
+    return snakeToCamel(data || []) as any;
   }
 
   const PAGE_SIZE = 1000;
-  query = query.limit(PAGE_SIZE);
-  const { data: firstPage, count, error } = await query;
-  if (error) throw { code: 'SUPABASE_ERROR', message: error.message };
-  let allData = firstPage || [];
-  if (count && count > PAGE_SIZE) {
-    const pages = Math.ceil(count / PAGE_SIZE);
-    for (let page = 1; page < pages; page++) {
-      const from = page * PAGE_SIZE;
-      const to = from + PAGE_SIZE - 1;
-      const { data: nextPage } = await (getSupabase() as any).from(table).select('*').range(from, to).limit(PAGE_SIZE);
-      if (nextPage) allData = allData.concat(nextPage);
-    }
+  let allData: any[] = [];
+  let from = 0;
+  while (true) {
+    const to = from + PAGE_SIZE - 1;
+    const { data, error } = await buildQuery(from, to).limit(PAGE_SIZE);
+    if (error) throw { code: 'SUPABASE_ERROR', message: error.message };
+    if (!data || data.length === 0) break;
+    allData = allData.concat(data);
+    if (data.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
   }
   return snakeToCamel(allData) as any;
 }
