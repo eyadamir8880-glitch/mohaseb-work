@@ -9,11 +9,11 @@ import { Badge } from '@/components/ui/badge';
 import { Select } from '@/components/ui/select';
 import { Modal } from '@/components/ui/modal';
 import { formatCurrency, formatDate, getStatusColor, generateId, generateNumber, downloadAsExcel } from '@/lib/utils';
-import { Plus, Search, Eye, Trash2, Wallet, Receipt, X } from 'lucide-react';
+import { Plus, Search, Eye, Trash2, Wallet, Receipt, X, Printer } from 'lucide-react';
 import { PAYMENT_METHODS } from '@/lib/constants';
 import type { Invoice, InvoiceItem, Customer, Product } from '@/lib/types';
 
-const statusFilters = ['all', 'draft', 'sent', 'paid', 'partially_paid', 'overdue', 'cancelled'] as const;
+const statusFilters = ['all', 'draft', 'sent', 'paid', 'partially_paid', 'overdue', 'cancelled', 'partially_returned', 'fully_returned'] as const;
 
 export default function InvoicesPage() {
   const { t, locale } = useLanguage();
@@ -34,6 +34,8 @@ export default function InvoicesPage() {
   const [paymentNotes, setPaymentNotes] = useState('');
 
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [productSearch, setProductSearch] = useState('');
+  const [focusedItemIndex, setFocusedItemIndex] = useState<number | null>(null);
   const [createForm, setCreateForm] = useState({
     invoiceNumber: '',
     customerId: '',
@@ -52,7 +54,7 @@ export default function InvoicesPage() {
       dueDate: new Date(Date.now() + 30 * 86400000).toISOString().split('T')[0],
       notes: '',
       terms: '',
-      items: [{ productId: '', productName: '', productNameAr: '', quantity: 1, unitPrice: 0, discountPercent: 0, taxPercent: 14, lineTotal: 0 }],
+      items: [{ productId: '', productName: '', productNameAr: '', quantity: 1, unitPrice: 0, discountPercent: 0, taxPercent: 0, lineTotal: 0 }],
     });
   };
 
@@ -64,7 +66,7 @@ export default function InvoicesPage() {
   const handleAddItem = () => {
     setCreateForm((prev) => ({
       ...prev,
-      items: [...prev.items, { productId: '', productName: '', productNameAr: '', quantity: 1, unitPrice: 0, discountPercent: 0, taxPercent: 14, lineTotal: 0 }],
+      items: [...prev.items, { productId: '', productName: '', productNameAr: '', quantity: 1, unitPrice: 0, discountPercent: 0, taxPercent: 0, lineTotal: 0 }],
     }));
   };
 
@@ -96,8 +98,7 @@ export default function InvoicesPage() {
 
   const calcSubtotal = () => createForm.items.reduce((sum, i) => sum + Number(i.quantity) * Number(i.unitPrice), 0);
   const calcDiscount = () => createForm.items.reduce((sum, i) => sum + Number(i.quantity) * Number(i.unitPrice) * Number(i.discountPercent) / 100, 0);
-  const calcTax = () => createForm.items.reduce((sum, i) => sum + Number(i.lineTotal) * Number(i.taxPercent) / 100, 0);
-  const calcGrandTotal = () => createForm.items.reduce((sum, i) => sum + Number(i.lineTotal) * (1 + Number(i.taxPercent) / 100), 0);
+  const calcGrandTotal = () => createForm.items.reduce((sum, i) => sum + Number(i.lineTotal), 0);
 
   const handleCreateInvoice = () => {
     if (!createForm.customerId || createForm.items.length === 0) return;
@@ -108,16 +109,16 @@ export default function InvoicesPage() {
       productName: i.productName,
       productNameAr: i.productNameAr,
       sku: products.find(p => p.id === i.productId)?.sku || '',
-      quantity: i.quantity,
-      unitPrice: i.unitPrice,
-      discountPercent: i.discountPercent,
-      taxPercent: i.taxPercent,
-      lineTotal: i.lineTotal,
+      quantity: Number(i.quantity) || 0,
+      unitPrice: Number(i.unitPrice) || 0,
+      discountPercent: Number(i.discountPercent) || 0,
+      taxPercent: Number(i.taxPercent) || 0,
+      lineTotal: Number(i.lineTotal) || 0,
     }));
     const subtotal = items.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
     const discountTotal = items.reduce((s, i) => s + i.quantity * i.unitPrice * i.discountPercent / 100, 0);
-    const taxTotal = items.reduce((s, i) => s + i.lineTotal * i.taxPercent / 100, 0);
-    const grandTotal = items.reduce((s, i) => s + i.lineTotal * (1 + i.taxPercent / 100), 0);
+    const taxTotal = 0;
+    const grandTotal = items.reduce((s, i) => s + i.lineTotal, 0);
     addInvoice({
       invoiceNumber: createForm.invoiceNumber,
       customerId: createForm.customerId,
@@ -165,6 +166,130 @@ export default function InvoicesPage() {
   const handleDeleteAll = () => {
     store.clearModuleData('invoices');
     setShowDeleteAll(false);
+  };
+
+  const handlePrint = (inv: Invoice) => {
+    const customer = customers.find(c => c.id === inv.customerId);
+    const getSetting = (key: string) => store.settings.find((s: any) => s.key === key)?.value || '';
+    const companyName = getSetting('companyName') || 'Company';
+    const companyAddress = getSetting('companyAddress');
+    const companyPhone = getSetting('companyPhone');
+    const companyEmail = getSetting('companyEmail');
+    const currency = getSetting('defaultCurrency') || 'EGP';
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Invoice ${inv.invoiceNumber}</title>
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 40px; color: #333; }
+          .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px; border-bottom: 2px solid #2563eb; padding-bottom: 20px; }
+          .company h1 { font-size: 22px; color: #2563eb; margin-bottom: 4px; }
+          .company p { font-size: 12px; color: #666; line-height: 1.6; }
+          .invoice-info { text-align: right; }
+          .invoice-info h2 { font-size: 28px; color: #2563eb; margin-bottom: 8px; }
+          .invoice-info p { font-size: 12px; color: #666; }
+          .status { display: inline-block; padding: 3px 10px; border-radius: 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; }
+          .status.paid { background: #dcfce7; color: #166534; }
+          .status.sent { background: #dbeafe; color: #1e40af; }
+          .status.draft { background: #f3f4f6; color: #374151; }
+          .status.overdue { background: #fef2f2; color: #991b1b; }
+          .status.partially_paid { background: #fef9c3; color: #854d0e; }
+          .details { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 30px; }
+          .details .label { font-size: 11px; color: #999; text-transform: uppercase; letter-spacing: 0.5px; }
+          .details .value { font-size: 13px; font-weight: 500; margin-top: 2px; }
+          table { width: 100%; border-collapse: collapse; margin-bottom: 20px; }
+          th { background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px 12px; text-align: left; font-size: 11px; text-transform: uppercase; color: #64748b; letter-spacing: 0.5px; }
+          td { border: 1px solid #e2e8f0; padding: 10px 12px; font-size: 13px; }
+          .text-right { text-align: right; }
+          .totals { float: right; width: 280px; }
+          .totals .row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 13px; }
+          .totals .row.total { border-top: 2px solid #2563eb; font-weight: 700; font-size: 15px; padding-top: 10px; margin-top: 6px; }
+          .footer { clear: both; margin-top: 40px; padding-top: 20px; border-top: 1px solid #e2e8f0; }
+          .footer p { font-size: 11px; color: #999; text-align: center; }
+          @media print { body { padding: 20px; } }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="company">
+            <h1>${companyName}</h1>
+            ${companyAddress ? `<p>${companyAddress}</p>` : ''}
+            ${companyPhone ? `<p>${companyPhone}</p>` : ''}
+            ${companyEmail ? `<p>${companyEmail}</p>` : ''}
+          </div>
+          <div class="invoice-info">
+            <h2>INVOICE</h2>
+            <p><strong>${inv.invoiceNumber}</strong></p>
+            <p>Date: ${new Date(inv.issueDate).toLocaleDateString()}</p>
+            <p>Due: ${new Date(inv.dueDate).toLocaleDateString()}</p>
+            <p style="margin-top:6px"><span class="status ${inv.status}">${inv.status.replace('_', ' ').toUpperCase()}</span></p>
+          </div>
+        </div>
+
+        <div class="details">
+          <div>
+            <div class="label">Bill To</div>
+            <div class="value">${customer ? (locale === 'ar' ? customer.nameAr || customer.name : customer.name) : '-'}</div>
+            ${customer?.email ? `<p style="font-size:12px;color:#666;margin-top:2px">${customer.email}</p>` : ''}
+            ${customer?.phone ? `<p style="font-size:12px;color:#666">${customer.phone}</p>` : ''}
+            ${customer?.address ? `<p style="font-size:12px;color:#666">${customer.address}</p>` : ''}
+          </div>
+          <div style="text-align:right">
+            <div class="label">Payment Info</div>
+            <div class="value">Paid: ${new Intl.NumberFormat(locale === 'ar' ? 'ar-EG' : 'en-EG', { style: 'currency', currency }).format(inv.paidAmount)}</div>
+            <div class="value" style="color:${(inv.grandTotal - inv.paidAmount) > 0 ? '#dc2626' : '#16a34a'}">
+              Balance: ${new Intl.NumberFormat(locale === 'ar' ? 'ar-EG' : 'en-EG', { style: 'currency', currency }).format(inv.grandTotal - inv.paidAmount)}
+            </div>
+          </div>
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Item</th>
+              <th>SKU</th>
+              <th class="text-right">Qty</th>
+              <th class="text-right">Unit Price</th>
+              <th class="text-right">Discount</th>
+              <th class="text-right">Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${(inv.items || []).map((item, i) => `
+              <tr>
+                <td>${i + 1}</td>
+                <td>${locale === 'ar' ? item.productNameAr || item.productName : item.productName}</td>
+                <td>${item.sku || '-'}</td>
+                <td class="text-right">${item.quantity}</td>
+                <td class="text-right">${new Intl.NumberFormat(locale === 'ar' ? 'ar-EG' : 'en-EG', { style: 'currency', currency }).format(item.unitPrice)}</td>
+                <td class="text-right">${item.discountPercent > 0 ? item.discountPercent + '%' : '-'}</td>
+                <td class="text-right">${new Intl.NumberFormat(locale === 'ar' ? 'ar-EG' : 'en-EG', { style: 'currency', currency }).format(item.lineTotal)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+
+        <div class="totals">
+          <div class="row"><span>Subtotal</span><span>${new Intl.NumberFormat(locale === 'ar' ? 'ar-EG' : 'en-EG', { style: 'currency', currency }).format(inv.subtotal)}</span></div>
+          ${inv.discountTotal > 0 ? `<div class="row"><span>Discount</span><span>-${new Intl.NumberFormat(locale === 'ar' ? 'ar-EG' : 'en-EG', { style: 'currency', currency }).format(inv.discountTotal)}</span></div>` : ''}
+          <div class="row total"><span>Grand Total</span><span>${new Intl.NumberFormat(locale === 'ar' ? 'ar-EG' : 'en-EG', { style: 'currency', currency }).format(inv.grandTotal)}</span></div>
+        </div>
+
+        ${inv.notes ? `<div class="footer"><p style="text-align:left;margin-bottom:10px"><strong>Notes:</strong> ${inv.notes}</p></div>` : ''}
+        <div class="footer"><p>Thank you for your business!</p></div>
+      </body>
+      </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => printWindow.print(), 300);
   };
 
   const handleRecordPayment = (inv: Invoice) => {
@@ -324,6 +449,9 @@ export default function InvoicesPage() {
                       </td>
                       <td className="p-3">
                         <div className="flex items-center justify-center gap-1">
+                          <Button variant="ghost" size="icon" title={t('invoices.printInvoice')} onClick={() => handlePrint(inv)}>
+                            <Printer className="h-4 w-4" />
+                          </Button>
                           <Button variant="ghost" size="icon" title="Record Payment" onClick={() => handleRecordPayment(inv)}>
                             <Wallet className="h-4 w-4" />
                           </Button>
@@ -357,7 +485,7 @@ export default function InvoicesPage() {
         </div>
       )}
 
-      <Modal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} title={t('invoices.addNew')} size="wide">
+      <Modal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} title={t('invoices.addNew')} size="full">
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <Input label={t('invoices.invoiceNumber')} value={createForm.invoiceNumber}
@@ -379,10 +507,55 @@ export default function InvoicesPage() {
             </div>
             {createForm.items.map((item, i) => (
               <div key={i} className="flex gap-2 items-end">
-                <Select value={item.productId}
-                  onChange={(e) => handleItemChange(i, 'productId', e.target.value)}
-                  options={products.map((p: Product) => ({ value: p.id, label: locale === 'ar' ? p.nameAr || p.name : p.name }))}
-                  placeholder={t('app.select')} className="flex-[2]" />
+                <div className="flex-[2] relative">
+                  <Input
+                    label={t('app.product')}
+                    value={focusedItemIndex === i ? productSearch : (locale === 'ar' ? products.find(p => p.id === item.productId)?.nameAr || products.find(p => p.id === item.productId)?.name : products.find(p => p.id === item.productId)?.name) || ''}
+                    onFocus={() => { setFocusedItemIndex(i); setProductSearch(''); }}
+                    onBlur={() => setTimeout(() => setFocusedItemIndex(null), 300)}
+                    onChange={(e) => {
+                      setProductSearch(e.target.value);
+                      setFocusedItemIndex(i);
+                    }}
+                    placeholder={`${t('app.search')}...`}
+                  />
+                  {focusedItemIndex === i && (() => {
+                    const filtered = products.filter((p) => {
+                      const q = productSearch.toLowerCase();
+                      if (!q) return true;
+                      return p.name.toLowerCase().includes(q) ||
+                        p.nameAr.toLowerCase().includes(q) ||
+                        p.sku.toLowerCase().includes(q);
+                    });
+                    return (
+                    <div className="absolute z-50 top-full mt-1 w-[800px] bg-white dark:bg-gray-800 border rounded-md shadow-lg overflow-auto" style={{ maxHeight: 'calc(95vh - 120px)' }}>
+                      <div className="grid grid-cols-[1fr_100px_100px] gap-2 px-3 py-2 bg-gray-100 dark:bg-gray-700 text-xs font-semibold text-gray-500 dark:text-gray-400 sticky top-0">
+                        <span>{t('app.name')}</span>
+                        <span className="text-right">{t('invoices.unitPrice')}</span>
+                        <span className="text-right">{t('products.sku')}</span>
+                      </div>
+                      {filtered.map((p) => (
+                        <div
+                          key={p.id}
+                          className="grid grid-cols-[1fr_100px_100px] gap-2 px-3 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 text-sm"
+                          onMouseDown={() => {
+                            handleItemChange(i, 'productId', p.id);
+                            setFocusedItemIndex(null);
+                            setProductSearch('');
+                          }}
+                        >
+                          <span className="truncate">{locale === 'ar' ? p.nameAr || p.name : p.name}</span>
+                          <span className="text-right">{formatCurrency(p.sellingPrice, 'EGP', locale)}</span>
+                          <span className="text-right text-gray-400">{p.sku}</span>
+                        </div>
+                      ))}
+                      {filtered.length === 0 && (
+                        <div className="px-3 py-2 text-gray-400 text-sm">{t('app.noResults')}</div>
+                      )}
+                    </div>
+                    );
+                  })()}
+                </div>
                 <Input type="number" min="1" value={item.quantity}
                   onChange={(e) => handleItemChange(i, 'quantity', e.target.value)}
                   className="w-20" label={t('invoices.quantity')} />
@@ -393,7 +566,7 @@ export default function InvoicesPage() {
                   onChange={(e) => handleItemChange(i, 'discountPercent', e.target.value)}
                   className="w-20" label={t('invoices.discount')} />
                 <div className="text-sm font-medium w-24 text-right pt-5">
-                  {formatCurrency(item.lineTotal * (1 + item.taxPercent / 100), 'EGP', locale)}
+                  {formatCurrency(item.lineTotal, 'EGP', locale)}
                 </div>
                 <Button variant="ghost" size="icon" onClick={() => handleRemoveItem(i)} className="mb-1">
                   <X className="h-4 w-4" />
@@ -410,10 +583,6 @@ export default function InvoicesPage() {
             <div className="flex justify-between w-64">
               <span>{t('invoices.discountTotal')}</span>
               <span className="text-red-600">-{formatCurrency(calcDiscount(), 'EGP', locale)}</span>
-            </div>
-            <div className="flex justify-between w-64">
-              <span>{t('invoices.taxTotal')}</span>
-              <span>{formatCurrency(calcTax(), 'EGP', locale)}</span>
             </div>
             <div className="flex justify-between w-64 font-bold border-t pt-1">
               <span>{t('invoices.grandTotal')}</span>

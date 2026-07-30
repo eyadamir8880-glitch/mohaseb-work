@@ -29,7 +29,7 @@ export default function DashboardPage() {
   const kpis = useMemo(() => {
     const totalRevenue = transactions.filter((t) => t.type === 'income').reduce((s, t) => s + t.amount, 0);
     const totalExpenses = transactions.filter((t) => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
-    const outstandingAmt = invoices.filter((i) => i.status === 'sent' || i.status === 'overdue').reduce((s, i) => s + i.grandTotal, 0);
+    const outstandingAmt = invoices.reduce((s, i) => s + Math.max(0, i.grandTotal - (i.paidAmount || 0)), 0);
     const currentBalance = treasuryAccounts.reduce((s, a) => s + (a.balance || 0), 0);
     return {
       totalRevenue, totalExpenses,
@@ -60,7 +60,7 @@ export default function DashboardPage() {
         const product = products.find(p => p.id === item.productId);
         if (product) {
           const cat = categories.find(c => c.id === product.categoryId);
-          const catName = cat ? (locale === 'ar' ? cat.nameAr : cat.name) : 'Uncategorized';
+          const catName = cat ? (locale === 'ar' ? cat.nameAr : cat.name) : t('app.noData');
           byCat[catName] = (byCat[catName] || 0) + item.lineTotal;
         }
       });
@@ -71,7 +71,7 @@ export default function DashboardPage() {
   const recentActivity = useMemo(() => {
     const all = [
       ...invoices.map((i) => ({ date: i.createdAt, text: `${t.invoices.title} ${i.invoiceNumber} - ${getCustomerName(i.customerId)}`, status: i.status, type: 'invoice' as const })),
-      ...transactions.map((tx) => ({ date: tx.createdAt, text: `${tx.type === 'income' ? tx.description : tx.description}`, status: tx.type, type: 'transaction' as const })),
+      ...transactions.map((tx) => ({ date: tx.createdAt, text: tx.description, status: tx.type, type: 'transaction' as const })),
     ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 10);
     return all;
   }, [invoices, transactions, t, customers, locale]);

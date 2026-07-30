@@ -25,25 +25,29 @@ export default function CustomersPage() {
     let result = [...customers];
     if (search) {
       const s = search.toLowerCase();
-      result = result.filter(c => c.name.toLowerCase().includes(s) || c.phone.includes(s) || c.email.toLowerCase().includes(s));
+      result = result.filter(c => c.name.toLowerCase().includes(s) || (c.nameAr && c.nameAr.toLowerCase().includes(s)) || c.phone.includes(s) || (c.email && c.email.toLowerCase().includes(s)));
     }
     return result;
   }, [customers, search]);
 
-  const getCustomerTotals = (customerId: string) => {
-    const custInvoices = invoices.filter(i => i.customerId === customerId);
-    const totalInvoiced = custInvoices.reduce((s, i) => s + i.grandTotal, 0);
-    const totalPaid = custInvoices.reduce((s, i) => s + (i.paidAmount || 0), 0);
-    return { totalInvoiced, totalPaid, totalDue: totalInvoiced - totalPaid };
-  };
+  const customerTotals = useMemo(() => {
+    const map: Record<string, { totalInvoiced: number; totalPaid: number; totalDue: number }> = {};
+    for (const c of customers) {
+      const custInvoices = invoices.filter(i => i.customerId === c.id);
+      const totalInvoiced = custInvoices.reduce((s, i) => s + i.grandTotal, 0);
+      const totalPaid = custInvoices.reduce((s, i) => s + (i.paidAmount || 0), 0);
+      map[c.id] = { totalInvoiced, totalPaid, totalDue: totalInvoiced - totalPaid };
+    }
+    return map;
+  }, [customers, invoices]);
 
   const columns = [
     { key: 'name', header: t('customers.name'), sortable: true, render: (item: any) => language === 'ar' ? item.nameAr || item.name : item.name },
     { key: 'phone', header: t('customers.phone') },
     { key: 'email', header: t('customers.email') },
-    { key: 'totalInvoiced', header: t('customers.totalInvoiced'), render: (item: any) => formatCurrency(getCustomerTotals(item.id).totalInvoiced, 'EGP', language) },
-    { key: 'totalPaid', header: t('customers.totalPaid'), render: (item: any) => formatCurrency(getCustomerTotals(item.id).totalPaid, 'EGP', language) },
-    { key: 'totalDue', header: t('customers.totalDue'), render: (item: any) => formatCurrency(getCustomerTotals(item.id).totalDue, 'EGP', language) },
+    { key: 'totalInvoiced', header: t('customers.totalInvoiced'), render: (item: any) => formatCurrency(customerTotals[item.id]?.totalInvoiced || 0, 'EGP', language) },
+    { key: 'totalPaid', header: t('customers.totalPaid'), render: (item: any) => formatCurrency(customerTotals[item.id]?.totalPaid || 0, 'EGP', language) },
+    { key: 'totalDue', header: t('customers.totalDue'), render: (item: any) => formatCurrency(customerTotals[item.id]?.totalDue || 0, 'EGP', language) },
     { key: 'creditLimit', header: t('customers.creditLimit'), render: (item: any) => formatCurrency(item.creditLimit, 'EGP', language) },
     { key: 'actions', header: t('app.actions'), render: (item: any) => (
       <div className="flex gap-1">

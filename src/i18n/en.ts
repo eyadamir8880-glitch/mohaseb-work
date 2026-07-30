@@ -63,6 +63,17 @@ const en = {
     select: 'Select...',
     no: 'No',
     deleteConfirm: 'Are you sure you want to delete this item?',
+    ok: 'OK',
+    open: 'Open',
+    in: 'IN',
+    out: 'OUT',
+    adj: 'ADJ',
+    active: 'Active',
+    outOfStock: 'Out of Stock',
+    created: 'Created',
+    updated: 'Updated',
+    deleted: 'Deleted',
+    default: 'Default',
   },
 
   nav: {
@@ -118,7 +129,7 @@ const en = {
     total: 'Total',
     addItem: 'Add Item',
     removeItem: 'Remove Item',
-    statuses: { draft: 'Draft', sent: 'Sent', paid: 'Paid', partially_paid: 'Partially Paid', overdue: 'Overdue', cancelled: 'Cancelled' },
+    statuses: { draft: 'Draft', sent: 'Sent', paid: 'Paid', partially_paid: 'Partially Paid', overdue: 'Overdue', cancelled: 'Cancelled', partially_returned: 'Partially Returned', fully_returned: 'Fully Returned' },
     markAsSent: 'Mark as Sent',
     markAsPaid: 'Mark as Paid',
     markAsOverdue: 'Mark as Overdue',
@@ -235,6 +246,7 @@ const en = {
     good: 'Good',
     bad: 'Damaged',
     refundAmount: 'Refund Amount',
+    returnNumber: 'Return #',
   },
 
   treasury: {

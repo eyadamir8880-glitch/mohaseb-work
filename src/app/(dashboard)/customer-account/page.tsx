@@ -82,6 +82,10 @@ export default function CustomerAccountPage() {
 
     statements.forEach(s => {
       if (s.type === 'invoice') return; // invoices processed via customerInvoices
+      if (s.type === 'opening_balance') {
+        openingBalance = s.debit - s.credit;
+        return;
+      }
       rows.push({
         date: s.date,
         reference: s.referenceNumber,
@@ -91,9 +95,6 @@ export default function CustomerAccountPage() {
         credit: s.credit,
         type: s.type,
       });
-      if (s.type === 'opening_balance') {
-        openingBalance = s.debit - s.credit;
-      }
     });
 
     rows.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
@@ -250,7 +251,7 @@ export default function CustomerAccountPage() {
                   )}
                   {filteredRows.map((row, idx) => (
                     <tr key={idx} className={`border-b hover:bg-slate-50 ${row.type === 'opening_balance' ? 'bg-slate-50 font-medium' : ''}`}>
-                      <td className="p-3 text-xs text-slate-600">{formatDate(row.date)}</td>
+                      <td className="p-3 text-xs text-slate-600">{formatDate(row.date, language)}</td>
                       <td className="p-3 text-xs font-mono text-blue-600">{row.reference}</td>
                       <td className="p-3 text-xs">{language === 'ar' ? row.descriptionAr : row.description}</td>
                       <td className="p-3 text-xs text-right font-mono">{row.debit > 0 ? formatCurrency(row.debit, 'EGP', language) : '—'}</td>

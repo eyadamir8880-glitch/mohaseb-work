@@ -8,7 +8,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
-import { generateId } from '@/lib/utils';
 
 export default function FiscalYearsPage() {
   const { language, t } = useLanguage();
@@ -17,6 +16,7 @@ export default function FiscalYearsPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [closeConfirmId, setCloseConfirmId] = useState<string | null>(null);
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: '', nameAr: '', startDate: '', endDate: '' });
 
   const fiscalYears = useMemo(() =>
@@ -73,7 +73,7 @@ export default function FiscalYearsPage() {
           <p className="kpi-value">{fiscalYears.length}</p>
         </div>
         <div className="kpi-card">
-          <p className="kpi-label">{t('fiscalYears.isClosed') === 'Open' ? 'Open' : t('fiscalYears.isClosed') === 'مغلقة' ? 'مفتوحة' : t('app.all')}</p>
+          <p className="kpi-label">{t('app.open')}</p>
           <p className="kpi-value text-emerald-600">{openYears}</p>
         </div>
         <div className="kpi-card">
@@ -118,7 +118,7 @@ export default function FiscalYearsPage() {
                         {t('fiscalYears.close')}
                       </Button>
                     )}
-                    <Button variant="ghost" size="sm" className="text-red-500" onClick={() => store.deleteFiscalYear(fy.id)}>
+                    <Button variant="ghost" size="sm" className="text-red-500" onClick={() => setDeleteConfirmId(fy.id)}>
                       {t('app.delete')}
                     </Button>
                   </div>
@@ -148,6 +148,14 @@ export default function FiscalYearsPage() {
         onConfirm={() => { if (closeConfirmId) handleClose(closeConfirmId); }}
         title={t('fiscalYears.close')}
         message={t('fiscalYears.confirmClose')}
+      />
+
+      <ConfirmModal
+        isOpen={deleteConfirmId !== null}
+        onClose={() => setDeleteConfirmId(null)}
+        onConfirm={() => { if (deleteConfirmId) store.deleteFiscalYear(deleteConfirmId); setDeleteConfirmId(null); }}
+        title={t('app.confirmDelete')}
+        message={t('app.deleteConfirm')}
       />
     </div>
   );

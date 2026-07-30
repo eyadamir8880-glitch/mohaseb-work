@@ -56,7 +56,7 @@ interface AppStore {
   deleteCustomer: (id: string) => void;
 
   addProduct: (product: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>) => Product;
-  bulkAddProducts: (products: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>[]) => Product[];
+  bulkAddProducts: (dataArr: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>[]) => Product[] | Promise<Product[]>;
   updateProduct: (id: string, data: Partial<Product>) => void;
   deleteProduct: (id: string) => void;
 
@@ -130,6 +130,8 @@ function stripChildArrays(obj: any): any {
   }
   return result;
 }
+
+export const syncPausedModules = new Set<string>();
 
 async function syncToSupabase(method: 'post' | 'put' | 'delete', endpoint: string, data?: any, retries = 3) {
   if (!isSupabaseConfigured) return;
@@ -236,13 +238,41 @@ export const useAppStore = create<AppStore>()(
               try {
                 const table = tableMap[m] || m;
                 for (let i = 0; i < data.length; i += 50) {
-                  const cleanBatch = data.slice(i, i + 50).map((d: any) => {
-                    const { items, payments, ...rest } = d;
-                    return camelToSnake(rest);
-                  });
-                  await (supabase as any).from(table).insert(cleanBatch);
+                  const batch = data.slice(i, i + 50);
+                  // For invoices, upload items and payments separately
+                  if (m === 'invoices') {
+                    const allItems: any[] = [];
+                    const allPayments: any[] = [];
+                    const invoiceBatch = batch.map((d: any) => {
+                      const { items, payments, ...rest } = d;
+                      if (items) items.forEach((item: any) => allItems.push({ ...item, invoiceId: d.id }));
+                      if (payments) payments.forEach((p: any) => allPayments.push({ ...p, invoiceId: d.id }));
+                      return camelToSnake(rest);
+                    });
+                    await (supabase as any).from(table).upsert(invoiceBatch, { onConflict: 'id' });
+                    if (allItems.length > 0) {
+                      await (supabase as any).from('invoice_items').upsert(allItems.map(camelToSnake), { onConflict: 'id' });
+                    }
+                    if (allPayments.length > 0) {
+                      await (supabase as any).from('invoice_payments').upsert(allPayments.map(camelToSnake), { onConflict: 'id' });
+                    }
+                  } else if (m === 'returns') {
+                    const allReturnItems: any[] = [];
+                    const returnBatch = batch.map((d: any) => {
+                      const { items, ...rest } = d;
+                      if (items) items.forEach((item: any) => allReturnItems.push({ ...item, returnId: d.id }));
+                      return camelToSnake(rest);
+                    });
+                    await (supabase as any).from(table).upsert(returnBatch, { onConflict: 'id' });
+                    if (allReturnItems.length > 0) {
+                      await (supabase as any).from('return_items').upsert(allReturnItems.map(camelToSnake), { onConflict: 'id' });
+                    }
+                  } else {
+                    const cleanBatch = batch.map((d: any) => camelToSnake(d));
+                    await (supabase as any).from(table).upsert(cleanBatch, { onConflict: 'id' });
+                  }
                 }
-              } catch {}
+              } catch (e) { console.error(`Bootstrap upload ${m} failed:`, e); }
             }
           }
         }
@@ -287,7 +317,7 @@ export const useAppStore = create<AppStore>()(
     const settingsArray: Setting[] = Object.entries(DEFAULT_SETTINGS).map(([key, value]) => ({
       id: generateId(), key, value: String(value), updatedAt: new Date().toISOString(),
     }));
-    set({
+    const finalData = {
       ...data, settings: settingsArray, paymentMethods: PAYMENT_METHODS,
       notifications: [{
         id: generateId(), type: 'system', title: 'Data Reset', titleAr: 'إعادة تعيين البيانات',
@@ -302,7 +332,47 @@ export const useAppStore = create<AppStore>()(
         oldValues: null, newValues: { action: 'Application data reset to demo' },
         ip: '127.0.0.1', createdAt: new Date().toISOString(),
       }],
-    } as any);
+    } as any;
+    set(finalData);
+
+    if (isSupabaseConfigured) {
+      const tableMap: Record<string, string> = {
+        treasuryAccounts: 'treasury_accounts',
+        treasuryTransactions: 'treasury_transactions', stockMovements: 'stock_movements',
+        chartOfAccounts: 'chart_of_accounts',
+        auditLogs: 'audit_logs', importHistory: 'import_sessions',
+        discountRules: 'discount_rules', paymentMethods: 'payment_methods',
+        customerStatements: 'customer_statements', fiscalYears: 'fiscal_years',
+      };
+      const supabaseTables = ['customers', 'products', 'categories', 'invoices', 'returns',
+        'treasury_accounts', 'treasury_transactions', 'warehouses', 'stock_movements',
+        'chart_of_accounts', 'notifications', 'audit_logs', 'settings', 'import_sessions',
+        'discount_rules', 'payment_methods', 'customer_statements', 'fiscal_years'];
+      const supabase = getSupabase();
+      // Delete all existing data first
+      for (const table of supabaseTables) {
+        (supabase as any).from(table).delete().neq('id', '00000000-0000-0000-0000-000000000000').then(() => {}).catch(() => {});
+      }
+      // Insert new demo data (delayed to allow deletes to start)
+      setTimeout(() => {
+        const modules = Object.keys(tableMap).concat(['customers', 'products', 'categories', 'invoices', 'returns', 'warehouses']);
+        for (const m of modules) {
+          const mData = finalData[m];
+          if (mData && mData.length > 0) {
+            const table = tableMap[m] || m;
+            try {
+              for (let i = 0; i < mData.length; i += 50) {
+                const cleanBatch = mData.slice(i, i + 50).map((d: any) => {
+                  const { items, payments, ...rest } = d;
+                  return camelToSnake(rest);
+                });
+                (supabase as any).from(table).upsert(cleanBatch, { onConflict: 'id' }).then(() => {}).catch(() => {});
+              }
+            } catch {}
+          }
+        }
+      }, 1000);
+    }
   },
 
   getStateSnapshot: () => {
@@ -320,7 +390,7 @@ export const useAppStore = create<AppStore>()(
         'treasuryAccounts', 'treasuryTransactions', 'warehouses',
         'stockMovements', 'chartOfAccounts', 'notifications', 'auditLogs',
         'settings', 'importHistory', 'discountRules', 'paymentMethods',
-        'customerStatements',
+        'customerStatements', 'fiscalYears',
       ];
       for (const mod of requiredModules) {
         if (!Array.isArray(state[mod])) {
@@ -341,7 +411,7 @@ export const useAppStore = create<AppStore>()(
           chartOfAccounts: 'chart_of_accounts',
           auditLogs: 'audit_logs', importHistory: 'import_sessions',
           discountRules: 'discount_rules', paymentMethods: 'payment_methods',
-          customerStatements: 'customer_statements',
+          customerStatements: 'customer_statements', fiscalYears: 'fiscal_years',
         };
         const supabase = getSupabase();
         for (const m of requiredModules) {
@@ -349,7 +419,51 @@ export const useAppStore = create<AppStore>()(
           if (data && data.length > 0) {
             try {
               const table = tableMap[m] || m;
-              (supabase as any).from(table).insert(data.map((d: any) => camelToSnake(d))).then(() => {}).catch((e: any) => console.error(`Batch insert ${table} failed:`, e));
+              if (m === 'invoices') {
+                const invoiceItems = data.flatMap((inv: any) => (inv.items || []).map((item: any) => ({ ...item, invoiceId: inv.id })));
+                if (invoiceItems.length > 0) {
+                  for (let i = 0; i < invoiceItems.length; i += 50) {
+                    const batch = invoiceItems.slice(i, i + 50).map((d: any) => camelToSnake(d));
+                    (supabase as any).from('invoice_items').upsert(batch, { onConflict: 'id' }).then(() => {}).catch((e: any) => console.error('Batch upsert invoice_items failed:', e));
+                  }
+                }
+                const invoicePayments = data.flatMap((inv: any) => (inv.payments || []).map((p: any) => ({ ...p, invoiceId: inv.id })));
+                if (invoicePayments.length > 0) {
+                  for (let i = 0; i < invoicePayments.length; i += 50) {
+                    const batch = invoicePayments.slice(i, i + 50).map((d: any) => camelToSnake(d));
+                    (supabase as any).from('invoice_payments').upsert(batch, { onConflict: 'id' }).then(() => {}).catch((e: any) => console.error('Batch upsert invoice_payments failed:', e));
+                  }
+                }
+                const cleanInvs = data.map((inv: any) => {
+                  const { items, payments, ...rest } = inv;
+                  return rest;
+                });
+                for (let i = 0; i < cleanInvs.length; i += 50) {
+                  const batch = cleanInvs.slice(i, i + 50).map((d: any) => camelToSnake(d));
+                  (supabase as any).from(table).upsert(batch, { onConflict: 'id' }).then(() => {}).catch((e: any) => console.error(`Batch upsert ${table} failed:`, e));
+                }
+              } else if (m === 'returns') {
+                const returnItems = data.flatMap((ret: any) => (ret.items || []).map((item: any) => ({ ...item, returnId: ret.id })));
+                if (returnItems.length > 0) {
+                  for (let i = 0; i < returnItems.length; i += 50) {
+                    const batch = returnItems.slice(i, i + 50).map((d: any) => camelToSnake(d));
+                    (supabase as any).from('return_items').upsert(batch, { onConflict: 'id' }).then(() => {}).catch((e: any) => console.error('Batch upsert return_items failed:', e));
+                  }
+                }
+                const cleanRets = data.map((ret: any) => {
+                  const { items, ...rest } = ret;
+                  return rest;
+                });
+                for (let i = 0; i < cleanRets.length; i += 50) {
+                  const batch = cleanRets.slice(i, i + 50).map((d: any) => camelToSnake(d));
+                  (supabase as any).from(table).upsert(batch, { onConflict: 'id' }).then(() => {}).catch((e: any) => console.error(`Batch upsert ${table} failed:`, e));
+                }
+              } else {
+                for (let i = 0; i < data.length; i += 50) {
+                  const batch = data.slice(i, i + 50).map((d: any) => camelToSnake(d));
+                  (supabase as any).from(table).upsert(batch, { onConflict: 'id' }).then(() => {}).catch((e: any) => console.error(`Batch upsert ${table} failed:`, e));
+                }
+              }
             } catch {}
           }
         }
@@ -386,7 +500,7 @@ export const useAppStore = create<AppStore>()(
     const statementIds = (state.customerStatements || []).filter(s => s.customerId === id).map(s => s.id);
     batchDeleteFromSupabase('invoice-items', invoiceItemIds);
     batchDeleteFromSupabase('invoices', invoiceIds);
-    batchDeleteFromSupabase('customerStatements', statementIds);
+    batchDeleteFromSupabase('customer_statements', statementIds);
     set((state) => ({
       customers: state.customers.filter(c => c.id !== id),
       invoices: state.invoices.filter(i => i.customerId !== id),
@@ -403,15 +517,32 @@ export const useAppStore = create<AppStore>()(
     syncToSupabase('post', 'products', product);
     return product;
   },
-  bulkAddProducts: (dataArr) => {
+  bulkAddProducts: async (dataArr) => {
     const products = dataArr.map(data => ({ ...data, id: generateId(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } as Product));
     set((state) => ({ products: [...products, ...state.products] }));
     get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'created', module: 'products', recordId: `${products.length} bulk`, oldValues: null, newValues: { count: products.length }, ip: '' });
     if (isSupabaseConfigured) {
       try {
         const supabase = getSupabase();
-        (supabase as any).from('products').insert(products.map(p => camelToSnake(p))).then(() => {}).catch((e: any) => console.error('Batch insert products failed:', e));
-      } catch {}
+        const BATCH_SIZE = 50;
+        for (let i = 0; i < products.length; i += BATCH_SIZE) {
+          const batch = products.slice(i, i + BATCH_SIZE).map((p: any) => {
+            const row: any = {};
+            for (const [k, v] of Object.entries(p)) {
+              const sk = k.replace(/([a-z0-9])([A-Z])/g, '$1_$2').replace(/([A-Z]+)([A-Z][a-z])/g, '$1_$2').toLowerCase();
+              if (k.endsWith('Id') && v === '') row[sk] = null;
+              else row[sk] = v;
+            }
+            return row;
+          });
+          const { error } = await (supabase as any).from('products').upsert(batch, { onConflict: 'id' });
+          if (error) {
+            console.error(`Batch upsert products error (batch ${i / BATCH_SIZE + 1}):`, error);
+          }
+        }
+      } catch (e) {
+        console.error('Bulk products sync failed:', e);
+      }
     }
     return products;
   },
@@ -430,8 +561,8 @@ export const useAppStore = create<AppStore>()(
     const stockMovementIds = state.stockMovements.filter(m => m.productId === id).map(m => m.id);
     const returnItemIds = state.returns.flatMap(r => (r.items || []).filter(item => item.productId === id).map(item => item.id));
     batchDeleteFromSupabase('invoice-items', invoiceItemIds);
-    batchDeleteFromSupabase('stockMovements', stockMovementIds);
-    batchDeleteFromSupabase('returnItems', returnItemIds);
+    batchDeleteFromSupabase('stock_movements', stockMovementIds);
+    batchDeleteFromSupabase('return_items', returnItemIds);
     syncToSupabase('delete', 'products', { id });
   },
 
@@ -460,7 +591,7 @@ export const useAppStore = create<AppStore>()(
       const itemsWithInvoice = items.map(item => ({ ...item, invoiceId: invoice.id }));
       try {
         const supabase = getSupabase();
-        supabase.from('invoice_items').insert(itemsWithInvoice.map(camelToSnake)).then(({ error }: any) => {
+        Promise.resolve((supabase as any).from('invoice_items').insert(itemsWithInvoice.map(camelToSnake))).then(({ error }: any) => {
           if (error) itemsWithInvoice.forEach(item => syncToSupabase('post', 'invoice-items', item));
         }).catch(() => itemsWithInvoice.forEach(item => syncToSupabase('post', 'invoice-items', item)));
       } catch {
@@ -483,9 +614,8 @@ export const useAppStore = create<AppStore>()(
       });
     }
     if (invoice.status !== 'draft' && invoice.items) {
-      const state = get();
       invoice.items.forEach(item => {
-        const product = state.products.find(p => p.id === item.productId);
+        const product = get().products.find(p => p.id === item.productId);
         if (product && product.trackInventory) {
           get().updateProduct(product.id, { stock: Math.max(0, product.stock - item.quantity) });
           get().addStockMovement({
@@ -493,7 +623,7 @@ export const useAppStore = create<AppStore>()(
             reason: `Invoice ${invoice.invoiceNumber}`,
             date: invoice.issueDate?.split('T')[0] || new Date().toISOString().split('T')[0],
             referenceType: 'invoice', referenceId: invoice.id,
-            warehouseId: state.warehouses[0]?.id || '',
+            warehouseId: get().warehouses[0]?.id || '',
           });
         }
       });
@@ -505,9 +635,8 @@ export const useAppStore = create<AppStore>()(
     const newStatus = data.status || old?.status || 'draft';
     const wasNonDraft = old?.status !== 'draft' && old?.status !== undefined;
     if (old && old.status === 'draft' && newStatus !== 'draft' && old.items) {
-      const state = get();
       old.items.forEach(item => {
-        const product = state.products.find(p => p.id === item.productId);
+        const product = get().products.find(p => p.id === item.productId);
         if (product && product.trackInventory) {
           get().updateProduct(product.id, { stock: Math.max(0, product.stock - item.quantity) });
           get().addStockMovement({
@@ -515,7 +644,7 @@ export const useAppStore = create<AppStore>()(
             reason: `Invoice ${old.invoiceNumber} status changed to ${newStatus}`,
             date: new Date().toISOString().split('T')[0],
             referenceType: 'invoice', referenceId: id,
-            warehouseId: state.warehouses[0]?.id || '',
+            warehouseId: get().warehouses[0]?.id || '',
           });
         }
       });
@@ -534,9 +663,8 @@ export const useAppStore = create<AppStore>()(
       }
     }
     if (wasNonDraft && newStatus === 'cancelled' && old.items) {
-      const state = get();
       old.items.forEach(item => {
-        const product = state.products.find(p => p.id === item.productId);
+        const product = get().products.find(p => p.id === item.productId);
         if (product && product.trackInventory) {
           get().updateProduct(product.id, { stock: product.stock + item.quantity });
           get().addStockMovement({
@@ -544,7 +672,7 @@ export const useAppStore = create<AppStore>()(
             reason: `Cancelled invoice ${old.invoiceNumber}`,
             date: new Date().toISOString().split('T')[0],
             referenceType: 'invoice', referenceId: id,
-            warehouseId: state.warehouses[0]?.id || '',
+            warehouseId: get().warehouses[0]?.id || '',
           });
         }
       });
@@ -556,9 +684,8 @@ export const useAppStore = create<AppStore>()(
   deleteInvoice: (id) => {
     const old = get().invoices.find(i => i.id === id);
     if (old && old.status !== 'draft' && old.items) {
-      const state = get();
       old.items.forEach(item => {
-        const product = state.products.find(p => p.id === item.productId);
+        const product = get().products.find(p => p.id === item.productId);
         if (product && product.trackInventory) {
           get().updateProduct(product.id, { stock: product.stock + item.quantity });
           get().addStockMovement({
@@ -566,21 +693,35 @@ export const useAppStore = create<AppStore>()(
             reason: `Reversal of deleted invoice ${old.invoiceNumber}`,
             date: new Date().toISOString().split('T')[0],
             referenceType: 'invoice', referenceId: id,
-            warehouseId: state.warehouses[0]?.id || '',
+            warehouseId: get().warehouses[0]?.id || '',
           });
         }
       });
     }
     // Reverse related treasury transactions
-    (old?.payments || []).forEach(p => {
-      const txs = get().treasuryTransactions.filter(tx => tx.linkedInvoiceId === id);
-      txs.forEach(tx => {
+    const linkedTxs = get().treasuryTransactions.filter(tx => tx.linkedInvoiceId === id);
+    linkedTxs.forEach(tx => {
+      if (tx.type === 'transfer') {
+        if (tx.fromAccountId) {
+          const fromAcc = get().treasuryAccounts.find(a => a.id === tx.fromAccountId);
+          if (fromAcc) {
+            get().updateTreasuryAccount(tx.fromAccountId, { balance: (fromAcc.balance || 0) + tx.amount });
+          }
+        }
+        if (tx.toAccountId) {
+          const toAcc = get().treasuryAccounts.find(a => a.id === tx.toAccountId);
+          if (toAcc) {
+            get().updateTreasuryAccount(tx.toAccountId, { balance: (toAcc.balance || 0) - tx.amount });
+          }
+        }
+      } else {
         const acc = get().treasuryAccounts.find(a => a.id === tx.accountId);
         if (acc) {
-          get().updateTreasuryAccount(tx.accountId, { balance: Math.max(0, (acc.balance || 0) - p.amount) });
+          const reversal = tx.type === 'income' ? -tx.amount : tx.amount;
+          get().updateTreasuryAccount(tx.accountId, { balance: (acc.balance || 0) + reversal });
         }
-        get().deleteTreasuryTransaction(tx.id);
-      });
+      }
+      get().deleteTreasuryTransaction(tx.id);
     });
     // Remove related customer statements
     if (old?.customerId) {
@@ -615,7 +756,7 @@ export const useAppStore = create<AppStore>()(
 
     if (wasDraft && invoice.items) {
       invoice.items.forEach(item => {
-        const product = state.products.find(p => p.id === item.productId);
+        const product = get().products.find(p => p.id === item.productId);
         if (product && product.trackInventory) {
           get().updateProduct(product.id, { stock: Math.max(0, product.stock - item.quantity) });
           get().addStockMovement({
@@ -685,12 +826,14 @@ export const useAppStore = create<AppStore>()(
     get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'created', module: 'returns', recordId: ret.id, oldValues: null, newValues: data, ip: '' });
     syncToSupabase('post', 'returns', ret);
 
-    // Stock reversal/update based on return items
+    // Stock update based on return items (only good condition items restore stock)
     if (ret.items && ret.items.length > 0) {
       ret.items.forEach((item: ReturnItem) => {
-        const product = get().products.find(p => p.id === item.productId);
-        if (product) {
-          get().updateProduct(product.id, { stock: (product.stock || 0) + item.quantity });
+        if ((item as any).condition === 'good' || !(item as any).condition) {
+          const product = get().products.find(p => p.id === item.productId);
+          if (product) {
+            get().updateProduct(product.id, { stock: (product.stock || 0) + item.quantity });
+          }
         }
         get().addStockMovement({
           productId: item.productId, variantId: item.variantId, type: 'in',
@@ -707,11 +850,18 @@ export const useAppStore = create<AppStore>()(
       if (invoice) {
         const allReturnedItems = ret.items?.length || 0;
         const invoiceItems = invoice.items?.length || 0;
-        const isFullReturn = allReturnedItems >= invoiceItems && ret.items?.every((ri, idx) => {
-          const invItem = invoice.items?.[idx];
+        const isFullReturn = allReturnedItems >= invoiceItems && ret.items?.every(ri => {
+          const invItem = invoice.items?.find(ii => ii.productId === ri.productId);
           return invItem && ri.quantity >= invItem.quantity;
         });
         get().updateInvoice(ret.originalInvoiceId, { status: isFullReturn ? 'fully_returned' : 'partially_returned' });
+        if (ret.refundAmount > 0) {
+          const inv = get().invoices.find(i => i.id === ret.originalInvoiceId);
+          if (inv) {
+            const newPaid = Math.max(0, (inv.paidAmount || 0) - ret.refundAmount);
+            get().updateInvoice(ret.originalInvoiceId, { paidAmount: newPaid });
+          }
+        }
       }
     }
 
@@ -848,15 +998,15 @@ export const useAppStore = create<AppStore>()(
     syncToSupabase('put', 'notifications', { id, isRead: true, readAt: new Date().toISOString() });
   },
   markAllNotificationsRead: () => {
-    set((state) => ({ notifications: state.notifications.map(n => ({ ...n, isRead: true, readAt: new Date().toISOString() })) }));
     const unread = get().notifications.filter(n => !n.isRead).map(n => n.id);
+    set((state) => ({ notifications: state.notifications.map(n => ({ ...n, isRead: true, readAt: new Date().toISOString() })) }));
     if (isSupabaseConfigured && unread.length > 0) {
       try {
         const supabase = getSupabase();
-        supabase.from('notifications').update({ is_read: true, read_at: new Date().toISOString() }).in('id', unread).then(() => {}).catch((e: any) => console.error('Batch mark notifications read failed:', e));
+        Promise.resolve((supabase as any).from('notifications').update({ is_read: true, read_at: new Date().toISOString() }).in('id', unread)).then(() => {}).catch((e: any) => console.error('Batch mark notifications read failed:', e));
       } catch {}
     }
-    set((state) => ({ notifications: state.notifications.map(n => n.isRead ? n : { ...n, isRead: true, readAt: new Date().toISOString() }) }));
+
   },
   clearNotifications: () => {
     const ids = get().notifications.map(n => n.id);
@@ -881,7 +1031,9 @@ export const useAppStore = create<AppStore>()(
     syncToSupabase('post', 'importHistory', session);
   },
 
-  clearModuleData: (module) => {
+  clearModuleData: async (module) => {
+    syncPausedModules.add(module);
+    try {
     const oldData = [...(get() as any)[module]];
     // Cascade cleanup for invoices
     if (module === 'invoices') {
@@ -892,21 +1044,51 @@ export const useAppStore = create<AppStore>()(
       linkedTxs.forEach(tx => {
         get().deleteTreasuryTransaction(tx.id);
       });
-      // Reset all treasury account balances
-      get().treasuryAccounts.forEach(acc => {
-        get().updateTreasuryAccount(acc.id, { balance: 0 });
+      // Recalculate treasury balances from remaining transactions
+      const remainingTxs = get().treasuryTransactions;
+      const balanceMap: Record<string, number> = {};
+      remainingTxs.forEach(tx => {
+        if (!balanceMap[tx.accountId]) balanceMap[tx.accountId] = 0;
+        balanceMap[tx.accountId] += tx.type === 'income' ? tx.amount : -tx.amount;
       });
+      get().treasuryAccounts.forEach(acc => {
+        get().updateTreasuryAccount(acc.id, { balance: balanceMap[acc.id] || 0 });
+      });
+      // Delete child records from Supabase using actual child IDs
+      const childItemIds = oldData.flatMap((i: any) => (i.items || []).map((item: any) => item.id));
+      const childPaymentIds = oldData.flatMap((i: any) => (i.payments || []).map((p: any) => p.id));
+      await batchDeleteFromSupabase('invoice-items', childItemIds);
+      await batchDeleteFromSupabase('invoice-payments', childPaymentIds);
       // Delete related customer statements
+      const stmtIds = get().customerStatements.filter(s => invoiceNumbers.includes(s.referenceNumber)).map(s => s.id);
       set((state) => ({
         customerStatements: state.customerStatements.filter(s => !invoiceNumbers.includes(s.referenceNumber))
       }));
+      await batchDeleteFromSupabase('customerStatements', stmtIds);
+    }
+    // Cascade cleanup for products
+    if (module === 'products') {
+      const productIds = oldData.map((p: any) => p.id);
+      const stockMovementIds = get().stockMovements.filter(m => productIds.includes(m.productId)).map(m => m.id);
+      const returnItemIds = get().returns.flatMap(r => (r.items || []).filter(item => productIds.includes(item.productId)).map(item => item.id));
+      await batchDeleteFromSupabase('stock-movements', stockMovementIds);
+      await batchDeleteFromSupabase('return-items', returnItemIds);
+    }
+    // Cascade cleanup for returns
+    if (module === 'returns') {
+      const returnItemIds = oldData.flatMap((r: any) => (r.items || []).map((item: any) => item.id));
+      await batchDeleteFromSupabase('return-items', returnItemIds);
+    }
+    // Delete from Supabase FIRST, then clear local state
+    if (isSupabaseConfigured) {
+      try {
+        await batchDeleteFromSupabase(module, oldData.map((item: any) => item.id));
+      } catch {}
     }
     set({ [module]: [] } as any);
     get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'deleted', module, recordId: 'all', oldValues: null, newValues: null, ip: '' });
-    if (isSupabaseConfigured) {
-      try {
-        batchDeleteFromSupabase(module, oldData.map((item: any) => item.id));
-      } catch {}
+    } finally {
+      syncPausedModules.delete(module);
     }
   },
 
@@ -965,7 +1147,7 @@ export const useAppStore = create<AppStore>()(
   },
   deleteFiscalYear: (id) => {
     set((state) => ({ fiscalYears: state.fiscalYears.filter(y => y.id !== id) }));
-    syncToSupabase('delete', `fiscalYears/${id}`, {});
+    syncToSupabase('delete', 'fiscalYears', { id });
   },
 
 

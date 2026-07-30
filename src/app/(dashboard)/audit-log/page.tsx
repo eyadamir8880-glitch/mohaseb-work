@@ -21,7 +21,7 @@ export default function AuditLogPage() {
     let result = [...auditLogs];
     if (search) {
       const s = search.toLowerCase();
-      result = result.filter(l => l.user.toLowerCase().includes(s) || l.module.toLowerCase().includes(s) || l.recordId.toLowerCase().includes(s));
+      result = result.filter(l => (l.user || '').toLowerCase().includes(s) || (l.module || '').toLowerCase().includes(s) || (l.recordId || '').toLowerCase().includes(s));
     }
     if (actionFilter) result = result.filter(l => l.action === actionFilter);
     if (moduleFilter) result = result.filter(l => l.module === moduleFilter);
@@ -49,7 +49,7 @@ export default function AuditLogPage() {
     )},
     { key: 'module', header: t('auditLog.module'), render: (item: any) => <span className="capitalize">{item.module}</span> },
     { key: 'recordId', header: t('auditLog.recordId'), render: (item: any) => (
-      <span className="font-mono text-xs">{item.recordId.slice(0, 8)}...</span>
+      <span className="font-mono text-xs">{(item.recordId || '').slice(0, 8)}...</span>
     )},
     { key: 'ip', header: t('auditLog.ip') },
     { key: 'actions', header: '', render: (item: any) => (
@@ -80,21 +80,17 @@ export default function AuditLogPage() {
         <Select value={actionFilter} onChange={(e) => setActionFilter(e.target.value)}
           options={[
             { value: '', label: t('app.filter') + '...' },
-            { value: 'created', label: 'Created' },
-            { value: 'updated', label: 'Updated' },
-            { value: 'deleted', label: 'Deleted' },
-            { value: 'viewed', label: 'Viewed' },
-            { value: 'exported', label: 'Exported' },
-            { value: 'paid', label: 'Paid' },
+            { value: 'created', label: t('app.created') },
+            { value: 'updated', label: t('app.updated') },
+            { value: 'deleted', label: t('app.deleted') },
           ]} className="max-w-[150px]" />
         <Select value={moduleFilter} onChange={(e) => setModuleFilter(e.target.value)}
           options={[
-            { value: '', label: 'Module...' },
-            { value: 'customers', label: 'Customers' },
-            { value: 'products', label: 'Products' },
-            { value: 'invoices', label: 'Invoices' },
-            { value: 'treasury', label: 'Treasury' },
-            { value: 'journalEntries', label: 'Journal Entries' },
+            { value: '', label: t('app.filter') + '...' },
+            { value: 'customers', label: t('nav.customers') },
+            { value: 'products', label: t('nav.products') },
+            { value: 'invoices', label: t('nav.invoices') },
+            { value: 'treasury', label: t('nav.treasury') },
           ]} className="max-w-[180px]" />
       </div>
 

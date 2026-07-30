@@ -213,7 +213,7 @@
   }
 
   .modal-content-full {
-    @apply modal-content max-w-5xl;
+    @apply modal-content max-w-5xl max-h-[95vh];
   }
 
   .page-header {

@@ -34,9 +34,12 @@ function camelToSnake(obj: any): any {
   if (typeof obj === 'object' && !(obj instanceof Date)) {
     const result: Record<string, any> = {};
     for (const [key, value] of Object.entries(obj)) {
-      if (key.endsWith('Id') && value === '') continue;
       const snakeKey = key.replace(/([a-z0-9])([A-Z])/g, '$1_$2').replace(/([A-Z]+)([A-Z][a-z])/g, '$1_$2').toLowerCase();
-      result[snakeKey] = camelToSnake(value);
+      if (key.endsWith('Id') && value === '') {
+        result[snakeKey] = null;
+      } else {
+        result[snakeKey] = camelToSnake(value);
+      }
     }
     return result;
   }
@@ -49,9 +52,11 @@ const endpointToTable: Record<string, string> = {
   'categories': 'categories',
   'invoices': 'invoices',
   'invoice-items': 'invoice_items',
+  'invoice_items': 'invoice_items',
   'returns': 'returns',
   'return-items': 'return_items',
   'returnItems': 'return_items',
+  'return_items': 'return_items',
   'treasury-accounts': 'treasury_accounts',
   'treasuryAccounts': 'treasury_accounts',
   'treasury-transactions': 'treasury_transactions',
@@ -59,26 +64,33 @@ const endpointToTable: Record<string, string> = {
   'warehouses': 'warehouses',
   'stock-movements': 'stock_movements',
   'stockMovements': 'stock_movements',
+  'stock_movements': 'stock_movements',
   'chart-of-accounts': 'chart_of_accounts',
   'chartOfAccounts': 'chart_of_accounts',
   'invoicePayments': 'invoice_payments',
   'invoice-payments': 'invoice_payments',
+  'invoice_payments': 'invoice_payments',
   'notifications': 'notifications',
   'audit-logs': 'audit_logs',
   'auditLogs': 'audit_logs',
   'settings': 'settings',
    'import-history': 'import_sessions',
    'importHistory': 'import_sessions',
+   'import_sessions': 'import_sessions',
   'discount-rules': 'discount_rules',
   'discountRules': 'discount_rules',
+  'discount_rules': 'discount_rules',
   'payment-methods': 'payment_methods',
   'paymentMethods': 'payment_methods',
+  'payment_methods': 'payment_methods',
   'deliveries': 'deliveries',
   'pricing-rules': 'pricing_rules',
   'customerStatements': 'customer_statements',
   'customer-statements': 'customer_statements',
+  'customer_statements': 'customer_statements',
   'fiscal-years': 'fiscal_years',
   'fiscalYears': 'fiscal_years',
+  'fiscal_years': 'fiscal_years',
   'productCategories': 'categories',
   'treasuryCategories': 'categories',
 };
@@ -212,17 +224,6 @@ export const apiClient = {
           .single();
         if (error) throw { code: 'SUPABASE_ERROR', message: error.message };
 
-        await (getSupabase() as any).from('audit_logs').insert({
-          timestamp: new Date().toISOString(),
-          user: 'Admin',
-          action: 'created',
-          module: table,
-          record_id: (inserted as any)?.id || '',
-          old_values: null,
-          new_values: camelToSnake(data),
-          ip: '',
-        });
-
         return responseInterceptor({ data: snakeToCamel(inserted), status: 201, message: 'Created successfully' });
       } catch (err: any) {
         throw errorInterceptor({ code: err.code || 'SERVER_ERROR', message: err.message || 'Failed to create' });
@@ -254,17 +255,6 @@ export const apiClient = {
           const { data: inserted, error: insertError } = await (getSupabase() as any).from(table).upsert(camelToSnake(data), { onConflict: 'id', ignoreDuplicates: false }).select().maybeSingle();
           if (insertError) throw { code: 'SUPABASE_ERROR', message: insertError.message };
           resultData = inserted;
-
-          await (getSupabase() as any).from('audit_logs').insert({
-            timestamp: new Date().toISOString(),
-            user: 'Admin',
-            action: 'created',
-            module: table,
-            record_id: id,
-            old_values: null,
-            new_values: camelToSnake(data),
-            ip: '',
-          });
         } else {
           const { data: updated, error } = await (getSupabase() as any)
             .from(table)
@@ -274,17 +264,6 @@ export const apiClient = {
             .maybeSingle();
           if (error) throw { code: 'SUPABASE_ERROR', message: error.message };
           resultData = updated;
-
-          await (getSupabase() as any).from('audit_logs').insert({
-            timestamp: new Date().toISOString(),
-            user: 'Admin',
-            action: 'updated',
-            module: table,
-            record_id: id,
-            old_values: oldData,
-            new_values: camelToSnake(data),
-            ip: '',
-          });
         }
 
         return responseInterceptor({ data: snakeToCamel(resultData), status: 200, message: 'Updated successfully' });
@@ -316,17 +295,6 @@ export const apiClient = {
         if (oldData) {
           const { error } = await (getSupabase() as any).from(table).delete().eq('id', id);
           if (error) throw { code: 'SUPABASE_ERROR', message: error.message };
-
-          await (getSupabase() as any).from('audit_logs').insert({
-            timestamp: new Date().toISOString(),
-            user: 'Admin',
-            action: 'deleted',
-            module: table,
-            record_id: id,
-            old_values: oldData,
-            new_values: null,
-            ip: '',
-          });
         }
 
         return responseInterceptor({ data: snakeToCamel(oldData), status: 200, message: 'Deleted successfully' });

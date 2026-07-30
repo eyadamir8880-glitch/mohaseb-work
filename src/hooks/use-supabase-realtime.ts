@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { useAppStore } from '@/stores/use-app-store';
+import { useAppStore, syncPausedModules } from '@/stores/use-app-store';
 import { isSupabaseConfigured, getSupabase } from '@/lib/supabase';
 import { apiClient } from '@/lib/api-client';
 import type { RealtimeChannel } from '@supabase/supabase-js';
@@ -25,7 +25,7 @@ const TABLE_MODULE_MAP: Record<string, string> = {
   payment_methods: 'paymentMethods',
   customer_statements: 'customerStatements',
   invoice_items: 'invoiceItems',
-  invoice_payments: 'payments',
+  invoice_payments: 'invoicePayments',
   return_items: 'returnItems',
   deliveries: 'deliveries',
 };
@@ -36,7 +36,7 @@ const POLL_MODULES = [
   'treasuryAccounts', 'treasuryTransactions', 'warehouses',
   'stockMovements', 'chartOfAccounts', 'notifications', 'auditLogs',
   'settings', 'importHistory', 'discountRules', 'paymentMethods',
-  'customerStatements',
+  'customerStatements', 'fiscalYears',
 ];
 
 export function useSupabaseRealtime() {
@@ -62,6 +62,7 @@ export function useSupabaseRealtime() {
           const table = payload.table as string;
           const mod = TABLE_MODULE_MAP[table];
           if (!mod || mod === 'invoiceItems' || mod === 'returnItems' || mod === 'deliveries') return;
+          if (syncPausedModules.has(mod)) return;
 
           if ((payload as any).event_type === 'DELETE') {
             const recordId = (payload as any).old?.id;
@@ -103,21 +104,19 @@ export function useSupabaseRealtime() {
     }
 
     const mergeWithLocal = (module: string, supabaseData: any[]) => {
+      if (syncPausedModules.has(module)) return;
       const currentData = useAppStore.getState() as any;
       const localData: any[] = currentData[module] || [];
       const supabaseIds = new Set(supabaseData.map((r: any) => r.id));
       const onlyLocal = localData.filter((r: any) => !supabaseIds.has(r.id));
-      if (onlyLocal.length > 0) {
-        const now = Date.now();
-        const lastPoll = pollTimestamps.current[module] || 0;
-        const trulyLocal = onlyLocal.filter((r: any) => {
-          const age = now - new Date(r.createdAt || r.updatedAt || now).getTime();
-          return age < 10000;
-        });
-        useAppStore.setState({ [module]: [...trulyLocal, ...supabaseData] });
-      } else {
-        useAppStore.setState({ [module]: supabaseData });
-      }
+      const lastSync = pollTimestamps.current[module] || 0;
+      // Keep local records that were created after last sync (pending sync),
+      // discard records that existed before last sync but are no longer in Supabase (deleted remotely)
+      const pendingLocal = onlyLocal.filter((r: any) => {
+        const createdAt = new Date(r.createdAt || 0).getTime();
+        return createdAt > lastSync;
+      });
+      useAppStore.setState({ [module]: [...pendingLocal, ...supabaseData] });
       pollTimestamps.current[module] = Date.now();
     };
 

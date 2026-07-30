@@ -27,7 +27,7 @@ export default function ProductsPage() {
   const [importStep, setImportStep] = useState<'upload' | 'preview' | 'result'>('upload');
   const [importing, setImporting] = useState(false);
   const [parsedRows, setParsedRows] = useState<{
-    sku: string; name: string; price: number; valid: boolean; reason: string; selected: boolean; rowIndex: number;
+    sku: string; name: string; price: number; stock: number; valid: boolean; reason: string; selected: boolean; rowIndex: number;
   }[]>([]);
   const [importResult, setImportResult] = useState<{ imported: number; skipped: number; errors: string[] } | null>(null);
   const [form, setForm] = useState({
@@ -39,7 +39,7 @@ export default function ProductsPage() {
   const filtered = useMemo(() => {
     return products.filter((p) => {
       const q = search.toLowerCase();
-      const matchSearch = !q || p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q);
+      const matchSearch = !q || p.name.toLowerCase().includes(q) || (p.nameAr && p.nameAr.toLowerCase().includes(q)) || p.sku.toLowerCase().includes(q);
       const matchCat = catFilter === 'all' || p.categoryId === catFilter;
       return matchSearch && matchCat;
     });
@@ -52,7 +52,7 @@ export default function ProductsPage() {
   });
 
   const getCategoryName = (catId: string) => {
-    return productCategories.find((c) => c.id === catId)?.name || '-';
+    return productCategories.find((c) => c.id === catId) ? (language === 'ar' ? productCategories.find((c) => c.id === catId)?.nameAr : productCategories.find((c) => c.id === catId)?.name) || '-' : '-';
   };
 
   const openAdd = () => {
@@ -122,7 +122,7 @@ export default function ProductsPage() {
     const rowKeys = Object.keys(row);
     for (const k of keys) {
       const match = rowKeys.find(rk => rk.toLowerCase() === k.toLowerCase());
-      if (match && row[match]) return String(row[match]).trim();
+      if (match && row[match] !== undefined && row[match] !== '') return String(row[match]).trim();
     }
     return '';
   };
@@ -138,17 +138,20 @@ export default function ProductsPage() {
       const rows: any[] = XLSX.utils.sheet_to_json(sheet);
       const existingSkus = new Set(products.map(p => p.sku.toLowerCase()));
       const parsed = rows.map((row, i) => {
-        const sku = getCol(row, 'product number', 'product_number', 'sku', 'productNumber', 'item number', 'item_number');
+        const rawSku = getCol(row, 'product number', 'product_number', 'sku', 'productNumber', 'item number', 'item_number');
+        const sku = rawSku ? rawSku.replace(/\r?\n/g, ', ').trim() : '';
         const name = getCol(row, 'name', 'product name', 'product_name', 'productName');
         const rawPrice = getCol(row, 'selling price', 'selling_price', 'sellingPrice', 'price', 'unit price', 'unit_price').replace(/[^0-9.]/g, '');
         const price = parseFloat(rawPrice) || 0;
+        const rawStock = getCol(row, 'stock', 'quantity', 'qty', 'opening_stock', 'openingStock').replace(/[^0-9.]/g, '');
+        const stock = parseFloat(rawStock) || 0;
         let valid = true;
         let reason = '';
         if (!sku) { valid = false; reason = t('import.missingSku'); }
         else if (!name) { valid = false; reason = t('import.missingName'); }
         else if (!rawPrice) { valid = false; reason = t('import.missingPrice'); }
         else if (existingSkus.has(sku.toLowerCase())) { valid = false; reason = t('import.duplicateSku'); }
-        return { sku, name, price, valid, reason, selected: valid, rowIndex: i };
+        return { sku, name, price, stock, valid, reason, selected: valid, rowIndex: i };
       });
       setParsedRows(parsed);
       setImportStep('preview');
@@ -177,7 +180,7 @@ export default function ProductsPage() {
         name: row.name, nameAr: '', sku: row.sku, barcode: '', description: '', descriptionAr: '',
         categoryId: '', purchasePrice: 0, sellingPrice: row.price,
         unitOfMeasure: 'piece', baseUnit: 'piece', conversionRate: 1,
-        trackInventory: true, stock: 0, lowStockThreshold: 0, reorderPoint: 0,
+        trackInventory: true, stock: row.stock, lowStockThreshold: 0, reorderPoint: 0,
         imageUrl: '', hasVariants: false, alternateSkus: [],
       })));
       setImportResult({ imported: selected.length, skipped: parsedRows.length - selected.length, errors: [] });
@@ -190,7 +193,7 @@ export default function ProductsPage() {
           name: row.name, nameAr: '', sku: row.sku, barcode: '', description: '', descriptionAr: '',
           categoryId: '', purchasePrice: 0, sellingPrice: row.price,
           unitOfMeasure: 'piece', baseUnit: 'piece', conversionRate: 1,
-          trackInventory: true, stock: 0, lowStockThreshold: 0, reorderPoint: 0,
+          trackInventory: true, stock: row.stock, lowStockThreshold: 0, reorderPoint: 0,
           imageUrl: '', hasVariants: false, alternateSkus: [],
         });
       } catch (e: any) {
@@ -273,7 +276,7 @@ export default function ProductsPage() {
               <tbody>
                 {filtered.map((p) => (
                   <tr key={p.id} className="border-b hover:bg-muted/50">
-                    <td className="p-3 font-medium">{p.name}</td>
+                    <td className="p-3 font-medium">{language === 'ar' ? p.nameAr || p.name : p.name}</td>
                     <td className="p-3 text-muted-foreground font-mono text-xs">{p.sku}</td>
                     <td className="p-3 text-muted-foreground">{getCategoryName(p.categoryId)}</td>
                     <td className="p-3 text-right">{formatCurrency(p.purchasePrice, 'EGP', language)}</td>
@@ -294,9 +297,9 @@ export default function ProductsPage() {
                       {p.trackInventory && p.stock <= p.lowStockThreshold ? (
                         <Badge variant="yellow">{t('products.lowStock')}</Badge>
                       ) : p.trackInventory && p.stock <= 0 ? (
-                        <Badge variant="red">Out</Badge>
+                        <Badge variant="red">{t('app.out')}</Badge>
                       ) : (
-                        <Badge variant="green">Active</Badge>
+                        <Badge variant="green">{t('app.active')}</Badge>
                       )}
                     </td>
                     <td className="p-3 text-center">
@@ -420,7 +423,7 @@ export default function ProductsPage() {
           <div className="fixed inset-0 bg-black/50" onClick={() => setDeleteId(null)} />
           <div className="relative bg-background rounded-lg shadow-xl w-full max-w-sm mx-4 p-6">
             <h2 className="text-lg font-semibold mb-2">{t('app.confirmDelete')}</h2>
-            <p className="text-sm text-muted-foreground mb-4">{t('app.noData')}</p>
+            <p className="text-sm text-muted-foreground mb-4">{t('app.confirmDelete')}</p>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setDeleteId(null)}>{t('app.cancel')}</Button>
               <Button variant="danger" onClick={handleDelete}>{t('app.yesDelete')}</Button>

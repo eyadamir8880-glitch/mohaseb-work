@@ -90,7 +90,8 @@ export default function SettingsPage() {
 
         <TabsContent value="company" className="mt-4 space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            <Input label="Company Name" value={getSetting('companyName')} onChange={(e) => { updateSetting('companyName', e.target.value); updateSetting('companyNameAr', e.target.value); }} />
+            <Input label="Company Name" value={getSetting('companyName')} onChange={(e) => updateSetting('companyName', e.target.value)} />
+            <Input label="Company Name (AR)" value={getSetting('companyNameAr')} onChange={(e) => updateSetting('companyNameAr', e.target.value)} />
             <Input label="Phone" value={getSetting('companyPhone')} onChange={(e) => updateSetting('companyPhone', e.target.value)} />
             <Input label="Email" value={getSetting('companyEmail')} onChange={(e) => updateSetting('companyEmail', e.target.value)} />
             <Input label="Address (EN)" value={getSetting('companyAddress')} onChange={(e) => updateSetting('companyAddress', e.target.value)} />
@@ -104,7 +105,6 @@ export default function SettingsPage() {
         <TabsContent value="invoice" className="mt-4 space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <Input label="Invoice Prefix" value={getSetting('invoicePrefix')} onChange={(e) => updateSetting('invoicePrefix', e.target.value)} />
-            <Input label="Default Tax Rate (%)" type="number" value={getSetting('defaultTaxRate')} onChange={(e) => updateSetting('defaultTaxRate', e.target.value)} />
           </div>
           <div>
             <label className="label">Invoice Terms (EN)</label>

@@ -15,6 +15,8 @@ export default function WarehousePage() {
   const { products, categories, stockMovements, warehouses, clearModuleData } = store;
   const [showDeleteAll, setShowDeleteAll] = useState(false);
 
+  const sortedMovements = useMemo(() => [...stockMovements].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()), [stockMovements]);
+
   const stats = useMemo(() => {
     const totalSKUs = products.length;
     const totalValue = products.reduce((s, p) => s + (p.purchasePrice * p.stock), 0);
@@ -54,12 +56,12 @@ export default function WarehousePage() {
     }},
     { key: 'type', header: t('app.type'), render: (item: any) => (
       <span className={`badge ${item.type === 'in' ? 'badge-green' : item.type === 'out' ? 'badge-red' : 'badge-yellow'}`}>
-        {item.type === 'in' ? 'IN' : item.type === 'out' ? 'OUT' : 'ADJ'}
+        {item.type === 'in' ? t('app.in') : item.type === 'out' ? t('app.out') : t('app.adj')}
       </span>
     )},
     { key: 'quantity', header: t('invoices.quantity'), sortable: true },
     { key: 'reason', header: t('returns.reason') },
-    { key: 'warehouseId', header: 'Warehouse', render: (item: any) => {
+    { key: 'warehouseId', header: t('warehouse.title'), render: (item: any) => {
       const w = warehouses.find(wh => wh.id === item.warehouseId);
       return w ? (language === 'ar' ? w.nameAr : w.name) : '-';
     }},
@@ -108,7 +110,7 @@ export default function WarehousePage() {
           <DataTable columns={productColumns} data={products.filter(p => p.trackInventory)} emptyMessage={t('app.noData')} />
         </TabsContent>
         <TabsContent value="movements" className="mt-4">
-          <DataTable columns={movementColumns} data={stockMovements.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())} emptyMessage={t('app.noData')} />
+          <DataTable columns={movementColumns} data={sortedMovements} emptyMessage={t('app.noData')} />
         </TabsContent>
       </Tabs>
 

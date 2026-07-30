@@ -127,7 +127,9 @@ function CategoryForm({ categoryId, defaultType, onSave, onCancel }: { categoryI
   const [parentId, setParentId] = useState(existing?.parentId || '');
 
   const handleSave = () => {
-    const data = { name, nameAr: name, type: type as any, parentId: parentId || null, description: '', sortOrder: 0 };
+    const trimmedName = name.trim();
+    if (!trimmedName) return;
+    const data = { name: trimmedName, nameAr: trimmedName, type: type as any, parentId: parentId || null, description: '', sortOrder: 0 };
     if (existing) {
       store.updateCategory(existing.id, data);
     } else {

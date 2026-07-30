@@ -63,6 +63,17 @@ const ar = {
     select: 'اختر...',
     no: 'لا',
     deleteConfirm: 'هل أنت متأكد من حذف هذا العنصر؟',
+    ok: 'حسناً',
+    open: 'مفتوح',
+    in: 'وارد',
+    out: 'صادر',
+    adj: 'تسوية',
+    active: 'نشط',
+    outOfStock: 'نفذ من المخزون',
+    created: 'تم الإنشاء',
+    updated: 'تم التحديث',
+    deleted: 'تم الحذف',
+    default: 'افتراضي',
   },
 
   nav: {
@@ -118,7 +129,7 @@ const ar = {
     total: 'الإجمالي',
     addItem: 'إضافة بند',
     removeItem: 'إزالة بند',
-    statuses: { draft: 'مسودة', sent: 'مرسلة', paid: 'مدفوعة', partially_paid: 'مدفوعة جزئياً', overdue: 'متأخرة', cancelled: 'ملغاة' },
+    statuses: { draft: 'مسودة', sent: 'مرسلة', paid: 'مدفوعة', partially_paid: 'مدفوعة جزئياً', overdue: 'متأخرة', cancelled: 'ملغاة', partially_returned: 'مرتجعة جزئياً', fully_returned: 'مرتجعة بالكامل' },
     markAsSent: 'تحديد كمرسلة',
     markAsPaid: 'تحديد كمدفوعة',
     markAsOverdue: 'تحديد كمتأخرة',
@@ -235,6 +246,7 @@ const ar = {
     good: 'سليم',
     bad: 'تالف',
     refundAmount: 'مبلغ الاسترداد',
+    returnNumber: 'رقم المرتجع',
   },
 
   treasury: {

@@ -19,7 +19,7 @@ export default function ReturnsPage() {
   const [showDeleteAll, setShowDeleteAll] = useState(false);
 
   const columns = [
-    { key: 'returnNumber', header: 'Return #', sortable: true },
+    { key: 'returnNumber', header: t('returns.returnNumber'), sortable: true },
     { key: 'type', header: t('app.type'), render: (item: any) => (
       <span className="badge badge-blue">
         {t('returns.customerReturn')}
@@ -63,10 +63,11 @@ export default function ReturnsPage() {
 
       <DataTable
         columns={columns}
-        data={returns.filter(r => r.type === 'customer')}
+        data={returns}
       />
 
-      <Modal isOpen={showDeleteAll} onClose={() => setShowDeleteAll(false)} title={t('app.deleteAllWarning')}>
+      <Modal isOpen={showDeleteAll} onClose={() => setShowDeleteAll(false)} title={t('app.deleteAll')}>
+        <p className="text-sm text-muted-foreground mb-4">{t('app.deleteAllWarning')}</p>
         <div className="flex justify-end gap-2 mt-4">
           <Button variant="outline" onClick={() => setShowDeleteAll(false)}>{t('app.cancel')}</Button>
           <Button variant="primary" onClick={handleDeleteAll} className="bg-red-600 hover:bg-red-700">{t('app.deleteAll')}</Button>
@@ -106,22 +107,6 @@ function ReturnForm({ onSave, onCancel }: { onSave: () => void; onCancel: () => 
     }));
 
     const totalRefund = returnItems.reduce((s, i) => s + i.refundAmount, 0);
-
-    if (selectedInvoice) {
-      returnItems.filter(i => condition === 'good').forEach(item => {
-        const product = store.products.find(p => p.id === item.productId);
-        if (product) store.updateProduct(product.id, { stock: product.stock + item.quantity });
-        store.addStockMovement({
-          productId: item.productId, variantId: item.variantId, type: 'in', quantity: item.quantity,
-          reason: 'Customer Return', date: new Date().toISOString().split('T')[0],
-          referenceType: 'return', referenceId: '', warehouseId: store.warehouses[0]?.id || '',
-        });
-      });
-
-      store.updateInvoice(selectedInvoice.id, {
-        status: selectedInvoice.grandTotal <= totalRefund ? 'fully_returned' : 'partially_returned',
-      });
-    }
 
     store.addReturn({
       returnNumber: `RET-${String(store.returns.length + 1).padStart(3, '0')}`,
@@ -168,10 +153,7 @@ function ReturnForm({ onSave, onCancel }: { onSave: () => void; onCancel: () => 
           { value: 'bad', label: t('returns.bad') },
         ]} />
       
-      <div>
-        <label className="label">{t('returns.reason')}</label>
-        <input className="input mt-1" value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Damaged, Wrong Item, etc." />
-      </div>
+      <Input label={t('returns.reason')} value={reason} onChange={(e) => setReason(e.target.value)} />
 
       <div className="flex justify-end gap-2">
         <Button variant="outline" onClick={onCancel}>{t('app.cancel')}</Button>

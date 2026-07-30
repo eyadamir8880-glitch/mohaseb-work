@@ -49,8 +49,9 @@ export default function ReportsPage() {
 
     const netOperating = operatingIncome - operatingExpenses;
 
-    const totalAccountsOpening = store.treasuryAccounts.reduce((s, a) => s + a.balance, 0);
-    const totalAccountsClosing = totalAccountsOpening + netOperating;
+    const currentBalance = store.treasuryAccounts.reduce((s, a) => s + (a.balance || 0), 0);
+    const totalAccountsOpening = currentBalance - netOperating;
+    const totalAccountsClosing = currentBalance;
 
     return {
       operatingIncome,
