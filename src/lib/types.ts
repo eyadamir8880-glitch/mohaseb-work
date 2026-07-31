@@ -299,7 +299,7 @@ export interface CustomerStatement {
   id: string;
   customerId: string;
   date: string;
-  type: 'invoice' | 'payment' | 'return' | 'opening_balance';
+  type: 'invoice' | 'payment' | 'return' | 'manual' | 'opening_balance';
   referenceNumber: string;
   description: string;
   descriptionAr: string;

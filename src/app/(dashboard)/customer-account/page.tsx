@@ -90,8 +90,9 @@ export default function CustomerAccountPage() {
     statements.forEach(s => {
       if (s.type === 'invoice') return; // invoices processed via activeInvoices
       if (s.type === 'opening_balance') return; // opening balance removed
+      if (s.type === 'return') return; // refunds already settled via treasury cash
       if (inactiveNumbers.has(s.referenceNumber)) return; // payments/refunds for draft/cancelled invoices
-      if (!activeInvoiceNumbers.has(s.referenceNumber)) return; // account-level payments/refunds settle via treasury, skip to avoid double counting
+      if (s.type === 'payment' && !activeInvoiceNumbers.has(s.referenceNumber)) return; // account-level payments not tied to an invoice
       rows.push({
         date: s.date,
         reference: s.referenceNumber,
@@ -204,7 +205,7 @@ export default function CustomerAccountPage() {
                   store.addCustomerStatement({
                     customerId: selectedCustomerId,
                     date: entryDate,
-                    type: 'payment',
+                    type: 'manual',
                     referenceNumber,
                     description: entryDesc,
                     descriptionAr: entryDescAr,
