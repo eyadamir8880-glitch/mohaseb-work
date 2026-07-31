@@ -469,6 +469,8 @@ const en = {
     debit: 'Debit',
     credit: 'Credit',
     totalDebit: 'Total Debit',
+    totalPaid: 'Total Paid',
+    remaining: 'Remaining',
     balance: 'Balance',
     type: 'Type',
     payment: 'Payment',

@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import { useLanguage } from '@/providers/language-provider';
 import { useAppStore } from '@/stores/use-app-store';
 import { formatCurrency, formatDate } from '@/lib/utils';
+import { PAYMENT_METHODS } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
@@ -24,7 +25,8 @@ export default function CustomerAccountPage() {
   const [entryDescAr, setEntryDescAr] = useState('');
   const [entryDebit, setEntryDebit] = useState('');
   const [entryCredit, setEntryCredit] = useState('');
-  const [entryType, setEntryType] = useState<'payment' | 'opening_balance'>('payment');
+  const [entryPaymentMethod, setEntryPaymentMethod] = useState('cash');
+  const [entryAccountId, setEntryAccountId] = useState('');
 
   const customer = customers.find(c => c.id === selectedCustomerId);
 
@@ -50,8 +52,6 @@ export default function CustomerAccountPage() {
       credit: number;
       type: string;
     }[] = [];
-
-    let openingBalance = 0;
 
     const activeInvoices = customerInvoices.filter(i => i.status !== 'draft' && i.status !== 'cancelled');
     const inactiveNumbers = new Set(
@@ -88,10 +88,7 @@ export default function CustomerAccountPage() {
 
     statements.forEach(s => {
       if (s.type === 'invoice') return; // invoices processed via activeInvoices
-      if (s.type === 'opening_balance') {
-        openingBalance = s.debit - s.credit;
-        return;
-      }
+      if (s.type === 'opening_balance') return; // opening balance removed
       if (inactiveNumbers.has(s.referenceNumber)) return; // payments/refunds for draft/cancelled invoices
       rows.push({
         date: s.date,
@@ -106,7 +103,7 @@ export default function CustomerAccountPage() {
 
     rows.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-    return { rows, openingBalance };
+    return { rows };
   }, [customerInvoices, statements]);
 
   const filteredRows = useMemo(() => {
@@ -115,8 +112,9 @@ export default function CustomerAccountPage() {
     if (dateTo) result = result.filter(r => r.date <= dateTo);
 
     const totalDebit = result.reduce((s, r) => s + r.debit, 0);
-    const totalCredit = result.reduce((s, r) => s + r.credit, 0);
-    let runningBalance = transactionRows.openingBalance;
+    const totalPaid = result.reduce((s, r) => s + r.credit, 0);
+    const remaining = totalDebit - totalPaid;
+    let runningBalance = 0;
 
     const withBalance = result.map(r => {
       runningBalance += r.debit - r.credit;
@@ -125,10 +123,10 @@ export default function CustomerAccountPage() {
 
     return {
       rows: withBalance,
-      openingBalance: transactionRows.openingBalance,
       totalDebit,
-      totalCredit,
-      closingBalance: transactionRows.openingBalance + totalDebit - totalCredit,
+      totalPaid,
+      remaining,
+      closingBalance: remaining,
     };
   }, [transactionRows, dateFrom, dateTo]);
 
@@ -182,53 +180,96 @@ export default function CustomerAccountPage() {
               <div className="grid grid-cols-3 gap-4">
                 <Input label={t('customerAccount.date')} type="date" value={entryDate} onChange={(e) => setEntryDate(e.target.value)} />
                 <Input label={t('customerAccount.reference')} value={entryRef} onChange={(e) => setEntryRef(e.target.value)} placeholder="e.g. MAN-001" />
-                <Select label={t('customerAccount.type')} value={entryType} onChange={(e) => setEntryType(e.target.value as any)} options={[
-                  { value: 'payment', label: t('customerAccount.payment') },
-                  { value: 'opening_balance', label: t('customerAccount.openingBalance') },
-                ]} />
+                <Select label={t('treasury.paymentMethod')} value={entryPaymentMethod} onChange={(e) => setEntryPaymentMethod(e.target.value)}
+                  options={store.paymentMethods.filter(p => p.isActive !== false).map(m => ({ value: m.id, label: language === 'ar' ? m.nameAr : m.name }))} />
+                <Select label={t('treasury.account')} value={entryAccountId} onChange={(e) => setEntryAccountId(e.target.value)}
+                  options={[
+                    { value: '', label: `-- ${t('treasury.account')} --` },
+                    ...store.treasuryAccounts.map(a => ({ value: a.id, label: language === 'ar' ? a.nameAr : a.name })),
+                  ]} />
                 <Input label={t('customerAccount.description')} value={entryDesc} onChange={(e) => setEntryDesc(e.target.value)} placeholder="English description" />
                 <Input label={t('customerAccount.descriptionAr')} value={entryDescAr} onChange={(e) => setEntryDescAr(e.target.value)} placeholder="الوصف بالعربية" />
                 <Input label={t('customerAccount.debit')} type="number" value={entryDebit} onChange={(e) => setEntryDebit(e.target.value)} placeholder="0" />
                 <Input label={t('customerAccount.credit')} type="number" value={entryCredit} onChange={(e) => setEntryCredit(e.target.value)} placeholder="0" />
               </div>
               <div className="flex justify-end gap-2 mt-4">
-                <Button variant="outline" onClick={() => { setShowEntryForm(false); setEntryDate(new Date().toISOString().split('T')[0]); setEntryRef(''); setEntryDesc(''); setEntryDescAr(''); setEntryDebit(''); setEntryCredit(''); }}>{t('app.cancel')}</Button>
+                <Button variant="outline" onClick={() => { setShowEntryForm(false); setEntryDate(new Date().toISOString().split('T')[0]); setEntryRef(''); setEntryDesc(''); setEntryDescAr(''); setEntryDebit(''); setEntryCredit(''); setEntryAccountId(''); }}>{t('app.cancel')}</Button>
                 <Button onClick={() => {
                   if (!entryDebit && !entryCredit) return;
+                  const debit = parseFloat(entryDebit) || 0;
+                  const credit = parseFloat(entryCredit) || 0;
+                  const referenceNumber = entryRef || `MAN-${Date.now()}`;
                   store.addCustomerStatement({
                     customerId: selectedCustomerId,
                     date: entryDate,
-                    type: entryType,
-                    referenceNumber: entryRef || `MAN-${Date.now()}`,
+                    type: 'payment',
+                    referenceNumber,
                     description: entryDesc,
                     descriptionAr: entryDescAr,
-                    debit: parseFloat(entryDebit) || 0,
-                    credit: parseFloat(entryCredit) || 0,
+                    debit,
+                    credit,
                     balance: 0,
                   });
+                  if (credit > 0) {
+                    let accountId = entryAccountId;
+                    if (!accountId) {
+                      const defaultAcc = store.treasuryAccounts[0];
+                      if (defaultAcc) accountId = defaultAcc.id;
+                      else {
+                        const acc = store.addTreasuryAccount({
+                          name: 'Main Cash', nameAr: 'الخزينة الرئيسية', type: 'cash',
+                          balance: 0, currency: 'EGP', isDefault: true,
+                        });
+                        accountId = acc.id;
+                      }
+                    }
+                    const method = [...store.paymentMethods, ...PAYMENT_METHODS].find(p => p.id === entryPaymentMethod);
+                    store.addTreasuryTransaction({
+                      type: 'income', amount: credit, date: entryDate,
+                      accountId,
+                      fromAccountId: null, toAccountId: null,
+                      paymentMethod: entryPaymentMethod,
+                      paymentMethodDetail: method ? (method.nameAr || method.name) : entryPaymentMethod,
+                      categoryId: '', description: entryDesc || `Manual payment - ${referenceNumber}`,
+                      descriptionAr: entryDescAr || `دفعة يدوية - ${referenceNumber}`,
+                      referenceNumber,
+                      receiptUrl: '', linkedInvoiceId: null, linkedPOId: null, linkedReturnId: null,
+                      isRecurring: false, recurringPattern: null, nextOccurrence: null,
+                      isReconciled: false, reconciledAt: null,
+                    });
+                    const account = store.treasuryAccounts.find(a => a.id === accountId);
+                    if (account) store.updateTreasuryAccount(accountId, { balance: (account.balance || 0) + credit });
+                  }
                   setShowEntryForm(false);
                   setEntryRef('');
                   setEntryDesc('');
                   setEntryDescAr('');
                   setEntryDebit('');
                   setEntryCredit('');
+                  setEntryAccountId('');
                 }}>{t('app.save')}</Button>
               </div>
             </div>
           )}
 
-          <div className="grid grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-5">
             <div className="card p-4">
               <p className="text-xs text-slate-500">{t('customers.name')}</p>
               <p className="text-lg font-semibold mt-1">{language === 'ar' ? customer.nameAr : customer.name}</p>
             </div>
             <div className="card p-4">
-              <p className="text-xs text-slate-500">{t('customerAccount.openingBalance')}</p>
-              <p className="text-lg font-semibold mt-1">{formatCurrency(filteredRows.openingBalance, 'EGP', language)}</p>
-            </div>
-            <div className="card p-4">
               <p className="text-xs text-slate-500">{t('customerAccount.totalDebit')}</p>
               <p className="text-lg font-semibold mt-1 text-red-600">{formatCurrency(filteredRows.totalDebit, 'EGP', language)}</p>
+            </div>
+            <div className="card p-4">
+              <p className="text-xs text-slate-500">{t('customerAccount.totalPaid')}</p>
+              <p className="text-lg font-semibold mt-1 text-emerald-600">{formatCurrency(filteredRows.totalPaid, 'EGP', language)}</p>
+            </div>
+            <div className="card p-4">
+              <p className="text-xs text-slate-500">{t('customerAccount.remaining')}</p>
+              <p className={`text-lg font-semibold mt-1 ${filteredRows.remaining >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {formatCurrency(filteredRows.remaining, 'EGP', language)}
+              </p>
             </div>
             <div className="card p-4">
               <p className="text-xs text-slate-500">{t('customerAccount.closingBalance')}</p>
@@ -275,7 +316,7 @@ export default function CustomerAccountPage() {
                   <tr className="bg-slate-100 font-semibold">
                     <td colSpan={3} className="p-3 text-xs">{t('customerAccount.totalDebit')}</td>
                     <td className="p-3 text-xs text-right font-mono">{formatCurrency(filteredRows.totalDebit, 'EGP', language)}</td>
-                    <td className="p-3 text-xs text-right font-mono">{formatCurrency(filteredRows.totalCredit, 'EGP', language)}</td>
+                    <td className="p-3 text-xs text-right font-mono">{formatCurrency(filteredRows.totalPaid, 'EGP', language)}</td>
                     <td className="p-3 text-xs text-right font-mono">{formatCurrency(filteredRows.closingBalance, 'EGP', language)}</td>
                   </tr>
                 </tfoot>

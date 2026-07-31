@@ -469,6 +469,8 @@ const ar = {
     debit: 'مدين',
     credit: 'دائن',
     totalDebit: 'إجمالي المدين',
+    totalPaid: 'إجمالي المدفوع',
+    remaining: 'المتبقي',
     balance: 'الرصيد',
     type: 'النوع',
     payment: 'دفعة',
