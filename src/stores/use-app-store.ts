@@ -1,5 +1,6 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { createJSONStorage, persist } from 'zustand/middleware';
+import type { StateStorage } from 'zustand/middleware';
 import { generateMockData } from '@/lib/mock-data';
 import { PAYMENT_METHODS, DEFAULT_SETTINGS } from '@/lib/constants';
 import { generateId } from '@/lib/utils';
@@ -155,6 +156,44 @@ async function syncToSupabase(method: 'post' | 'put' | 'delete', endpoint: strin
     }
   }
 }
+
+const UI_STATE_KEYS = ['language', 'theme', 'sidebarCollapsed'];
+
+const safeStorage: StateStorage = {
+  getItem: (name) => {
+    try {
+      return localStorage.getItem(name);
+    } catch {
+      return null;
+    }
+  },
+  setItem: (name, value) => {
+    try {
+      localStorage.setItem(name, value);
+    } catch {
+      // Quota exceeded (data too large for localStorage). Persist only UI state
+      // so data-heavy Supabase-backed installs don't crash; data still loads from Supabase.
+      try {
+        const full = JSON.parse(value || '{}');
+        const trimmed: Record<string, unknown> = {};
+        for (const k of Object.keys(full)) {
+          const v = full[k];
+          if (UI_STATE_KEYS.includes(k) || (Array.isArray(v) && v.length === 0) || typeof v !== 'object') {
+            trimmed[k] = v;
+          }
+        }
+        localStorage.setItem(name, JSON.stringify(trimmed));
+      } catch {
+        // storage unavailable; skip persistence
+      }
+    }
+  },
+  removeItem: (name) => {
+    try {
+      localStorage.removeItem(name);
+    } catch {}
+  },
+};
 
 export const useAppStore = create<AppStore>()(
   persist<AppStore>(
@@ -1187,15 +1226,21 @@ export const useAppStore = create<AppStore>()(
 
 }), {
   name: 'mohasebeyad-storage',
+  storage: createJSONStorage(() => safeStorage),
   partialize: (state: any) => {
     const { setLanguage, setTheme, toggleSidebar, initializeStore, resetToDemo,
             getStateSnapshot, loadState, addAuditLog, ...data } = state;
     return data;
   },
   merge: (persisted: any, current: any) => {
+    const ui = {
+      language: persisted?.language ?? current.language,
+      theme: persisted?.theme ?? current.theme,
+      sidebarCollapsed: persisted?.sidebarCollapsed ?? current.sidebarCollapsed,
+    };
     const hasAnyData = persisted && Object.values(persisted).some((v: any) => Array.isArray(v) && v.length > 0);
     if (hasAnyData) {
-      const merged = { ...current, ...persisted, isInitialized: isSupabaseConfigured ? false : true };
+      const merged = { ...current, ...persisted, ...ui, isInitialized: isSupabaseConfigured ? false : true };
       for (const key of Object.keys(current)) {
         if (Array.isArray(current[key]) && !Array.isArray(merged[key])) {
           merged[key] = [];
@@ -1203,7 +1248,7 @@ export const useAppStore = create<AppStore>()(
       }
       return merged;
     }
-    return current;
+    return { ...current, ...ui };
   },
 }),
 );
