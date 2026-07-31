@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 import { generateMockData } from '@/lib/mock-data';
 import { PAYMENT_METHODS, DEFAULT_SETTINGS } from '@/lib/constants';
 import { generateId } from '@/lib/utils';
-import { apiClient, camelToSnake, batchDeleteFromSupabase } from '@/lib/api-client';
+import { apiClient, camelToSnake, batchDeleteFromSupabase, updateSetNullFromSupabase } from '@/lib/api-client';
 import { isSupabaseConfigured, getSupabase } from '@/lib/supabase';
 import type {
   Customer, Product, Category,
@@ -1039,21 +1039,10 @@ export const useAppStore = create<AppStore>()(
     if (module === 'invoices') {
       const invoiceIds = oldData.map((i: any) => i.id);
       const invoiceNumbers = oldData.map((i: any) => i.invoiceNumber);
-      // Delete linked treasury transactions
-      const linkedTxs = get().treasuryTransactions.filter(tx => invoiceIds.includes(tx.linkedInvoiceId));
-      linkedTxs.forEach(tx => {
-        get().deleteTreasuryTransaction(tx.id);
-      });
-      // Recalculate treasury balances from remaining transactions
-      const remainingTxs = get().treasuryTransactions;
-      const balanceMap: Record<string, number> = {};
-      remainingTxs.forEach(tx => {
-        if (!balanceMap[tx.accountId]) balanceMap[tx.accountId] = 0;
-        balanceMap[tx.accountId] += tx.type === 'income' ? tx.amount : -tx.amount;
-      });
-      get().treasuryAccounts.forEach(acc => {
-        get().updateTreasuryAccount(acc.id, { balance: balanceMap[acc.id] || 0 });
-      });
+      // Unlink linked treasury transactions
+      await updateSetNullFromSupabase('treasury-transactions', 'linked_invoice_id', invoiceIds);
+      // Unlink converted quotations
+      await updateSetNullFromSupabase('quotations', 'converted_invoice_id', invoiceIds);
       // Delete child records from Supabase using actual child IDs
       const childItemIds = oldData.flatMap((i: any) => (i.items || []).map((item: any) => item.id));
       const childPaymentIds = oldData.flatMap((i: any) => (i.payments || []).map((p: any) => p.id));
@@ -1071,19 +1060,64 @@ export const useAppStore = create<AppStore>()(
       const productIds = oldData.map((p: any) => p.id);
       const stockMovementIds = get().stockMovements.filter(m => productIds.includes(m.productId)).map(m => m.id);
       const returnItemIds = get().returns.flatMap(r => (r.items || []).filter(item => productIds.includes(item.productId)).map(item => item.id));
+      await batchDeleteFromSupabase('invoice-items', productIds, 'product_id');
+      await batchDeleteFromSupabase('quotation-items', productIds, 'product_id');
+      await batchDeleteFromSupabase('purchase-order-items', productIds, 'product_id');
       await batchDeleteFromSupabase('stock-movements', stockMovementIds);
       await batchDeleteFromSupabase('return-items', returnItemIds);
     }
     // Cascade cleanup for returns
     if (module === 'returns') {
+      const returnIds = oldData.map((r: any) => r.id);
+      await updateSetNullFromSupabase('treasury-transactions', 'linked_return_id', returnIds);
       const returnItemIds = oldData.flatMap((r: any) => (r.items || []).map((item: any) => item.id));
       await batchDeleteFromSupabase('return-items', returnItemIds);
     }
+    // Cascade cleanup for customers
+    if (module === 'customers') {
+      const customerIds = oldData.map((c: any) => c.id);
+      await batchDeleteFromSupabase('pricing-rules', customerIds, 'customer_id');
+      await batchDeleteFromSupabase('quotations', customerIds, 'customer_id');
+      const customerInvoices = get().invoices.filter(i => customerIds.includes(i.customerId));
+      const invoiceIds = customerInvoices.map((i: any) => i.id);
+      await updateSetNullFromSupabase('treasury-transactions', 'linked_invoice_id', invoiceIds);
+      const childItemIds = customerInvoices.flatMap((i: any) => (i.items || []).map((item: any) => item.id));
+      const childPaymentIds = customerInvoices.flatMap((i: any) => (i.payments || []).map((p: any) => p.id));
+      await batchDeleteFromSupabase('invoice-items', childItemIds);
+      await batchDeleteFromSupabase('invoice-payments', childPaymentIds);
+      await batchDeleteFromSupabase('invoices', invoiceIds);
+    }
+    // Cascade cleanup for categories
+    if (module === 'categories') {
+      const categoryIds = oldData.map((c: any) => c.id);
+      const linkedProductIds = get().products.filter(p => categoryIds.includes(p.categoryId)).map((p: any) => p.id);
+      if (linkedProductIds.length > 0) {
+        const stockMovementIds = get().stockMovements.filter(m => linkedProductIds.includes(m.productId)).map(m => m.id);
+        const returnItemIds = get().returns.flatMap(r => (r.items || []).filter(item => linkedProductIds.includes(item.productId)).map(item => item.id));
+        await batchDeleteFromSupabase('invoice-items', linkedProductIds, 'product_id');
+        await batchDeleteFromSupabase('quotation-items', linkedProductIds, 'product_id');
+        await batchDeleteFromSupabase('purchase-order-items', linkedProductIds, 'product_id');
+        await batchDeleteFromSupabase('stock-movements', stockMovementIds);
+        await batchDeleteFromSupabase('return-items', returnItemIds);
+        await batchDeleteFromSupabase('products', linkedProductIds);
+      }
+      const linkedTxIds = get().treasuryTransactions.filter(tx => categoryIds.includes(tx.categoryId)).map(tx => tx.id);
+      if (linkedTxIds.length > 0) {
+        await batchDeleteFromSupabase('treasury-transactions', linkedTxIds);
+        get().treasuryAccounts.forEach(acc => {
+          get().updateTreasuryAccount(acc.id, { balance: 0 });
+        });
+      }
+    }
+    // Recalculate treasury balances after clearing transactions
+    if (module === 'treasuryTransactions') {
+      get().treasuryAccounts.forEach(acc => {
+        get().updateTreasuryAccount(acc.id, { balance: 0 });
+      });
+    }
     // Delete from Supabase FIRST, then clear local state
     if (isSupabaseConfigured) {
-      try {
-        await batchDeleteFromSupabase(module, oldData.map((item: any) => item.id));
-      } catch {}
+      await batchDeleteFromSupabase(module, oldData.map((item: any) => item.id));
     }
     set({ [module]: [] } as any);
     get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'deleted', module, recordId: 'all', oldValues: null, newValues: null, ip: '' });

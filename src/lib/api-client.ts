@@ -84,7 +84,12 @@ const endpointToTable: Record<string, string> = {
   'paymentMethods': 'payment_methods',
   'payment_methods': 'payment_methods',
   'deliveries': 'deliveries',
+  'quotations': 'quotations',
   'pricing-rules': 'pricing_rules',
+  'quotation-items': 'quotation_items',
+  'quotation_items': 'quotation_items',
+  'purchase-order-items': 'purchase_order_items',
+  'purchase_order_items': 'purchase_order_items',
   'customerStatements': 'customer_statements',
   'customer-statements': 'customer_statements',
   'customer_statements': 'customer_statements',
@@ -353,12 +358,34 @@ export const apiClient = {
   },
 };
 
-export async function batchDeleteFromSupabase(tableEndpoint: string, ids: string[]) {
+export async function batchDeleteFromSupabase(tableEndpoint: string, ids: string[], column = 'id'): Promise<void> {
   if (!isSupabaseConfigured || ids.length === 0) return;
   const table = getTable(tableEndpoint);
   if (!table) return;
-  const { error } = await (getSupabase() as any).from(table).delete().in('id', ids);
-  if (error) console.error(`Batch delete from ${table} failed:`, error);
+  const BATCH_SIZE = 200;
+  for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+    const batch = ids.slice(i, i + BATCH_SIZE);
+    const { error } = await (getSupabase() as any).from(table).delete().in(column, batch);
+    if (error) {
+      console.error(`Batch delete from ${table} failed:`, error);
+      throw { code: 'SUPABASE_ERROR', message: error.message };
+    }
+  }
+}
+
+export async function updateSetNullFromSupabase(tableEndpoint: string, column: string, ids: string[]): Promise<void> {
+  if (!isSupabaseConfigured || ids.length === 0) return;
+  const table = getTable(tableEndpoint);
+  if (!table) return;
+  const BATCH_SIZE = 200;
+  for (let i = 0; i < ids.length; i += BATCH_SIZE) {
+    const batch = ids.slice(i, i + BATCH_SIZE);
+    const { error } = await (getSupabase() as any).from(table).update({ [column]: null }).in(column, batch);
+    if (error) {
+      console.error(`Update ${table} set ${column}=null failed:`, error);
+      throw { code: 'SUPABASE_ERROR', message: error.message };
+    }
+  }
 }
 
 async function supabaseGetDashboard(): Promise<any> {
