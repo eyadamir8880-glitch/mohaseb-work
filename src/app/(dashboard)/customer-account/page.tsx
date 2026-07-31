@@ -54,6 +54,7 @@ export default function CustomerAccountPage() {
     }[] = [];
 
     const activeInvoices = customerInvoices.filter(i => i.status !== 'draft' && i.status !== 'cancelled');
+    const activeInvoiceNumbers = new Set(activeInvoices.map(i => i.invoiceNumber));
     const inactiveNumbers = new Set(
       customerInvoices.filter(i => i.status === 'draft' || i.status === 'cancelled').map(i => i.invoiceNumber)
     );
@@ -90,6 +91,7 @@ export default function CustomerAccountPage() {
       if (s.type === 'invoice') return; // invoices processed via activeInvoices
       if (s.type === 'opening_balance') return; // opening balance removed
       if (inactiveNumbers.has(s.referenceNumber)) return; // payments/refunds for draft/cancelled invoices
+      if (!activeInvoiceNumbers.has(s.referenceNumber)) return; // account-level payments/refunds settle via treasury, skip to avoid double counting
       rows.push({
         date: s.date,
         reference: s.referenceNumber,
@@ -267,7 +269,7 @@ export default function CustomerAccountPage() {
             </div>
             <div className="card p-4">
               <p className="text-xs text-slate-500">{t('customerAccount.remaining')}</p>
-              <p className={`text-lg font-semibold mt-1 ${filteredRows.remaining >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              <p className="text-lg font-semibold mt-1 text-red-600">
                 {formatCurrency(filteredRows.remaining, 'EGP', language)}
               </p>
             </div>
