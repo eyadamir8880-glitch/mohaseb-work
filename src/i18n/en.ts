@@ -127,6 +127,7 @@ const en = {
     quantity: 'Quantity',
     price: 'Price',
     total: 'Total',
+    maxQty: 'Max Qty',
     addItem: 'Add Item',
     removeItem: 'Remove Item',
     statuses: { draft: 'Draft', sent: 'Sent', paid: 'Paid', partially_paid: 'Partially Paid', overdue: 'Overdue', cancelled: 'Cancelled', partially_returned: 'Partially Returned', fully_returned: 'Fully Returned' },
@@ -247,6 +248,7 @@ const en = {
     bad: 'Damaged',
     refundAmount: 'Refund Amount',
     returnNumber: 'Return #',
+    refundMethod: 'Refund Method',
   },
 
   treasury: {

@@ -894,29 +894,26 @@ export const useAppStore = create<AppStore>()(
           return invItem && ri.quantity >= invItem.quantity;
         });
         get().updateInvoice(ret.originalInvoiceId, { status: isFullReturn ? 'fully_returned' : 'partially_returned' });
-        if (ret.refundAmount > 0) {
-          const inv = get().invoices.find(i => i.id === ret.originalInvoiceId);
-          if (inv) {
-            const newPaid = Math.max(0, (inv.paidAmount || 0) - ret.refundAmount);
-            get().updateInvoice(ret.originalInvoiceId, { paidAmount: newPaid });
-          }
-        }
       }
     }
 
     // Customer statement for refund
     if (ret.originalInvoiceId && ret.refundAmount > 0) {
-      get().addCustomerStatement({
-        customerId: get().invoices.find(inv => inv.id === ret.originalInvoiceId)?.customerId || '',
-        date: new Date().toISOString().split('T')[0],
-        type: 'payment',
-        referenceNumber: ret.returnNumber,
-        description: `Refund - ${ret.returnNumber}`,
-        descriptionAr: `مرتجعات - ${ret.returnNumber}`,
-        debit: 0,
-        credit: ret.refundAmount,
-        balance: 0,
-      });
+      const refundDate = new Date().toISOString().split('T')[0];
+      const refundInvoice = get().invoices.find(inv => inv.id === ret.originalInvoiceId);
+      if (refundInvoice?.customerId) {
+        get().addCustomerStatement({
+          customerId: refundInvoice.customerId,
+          date: refundDate,
+          type: 'return',
+          referenceNumber: ret.returnNumber,
+          description: `Refund - ${ret.returnNumber}`,
+          descriptionAr: `مرتجعات - ${ret.returnNumber}`,
+          debit: 0,
+          credit: ret.refundAmount,
+          balance: 0,
+        });
+      }
     }
 
     if (ret.refundAmount > 0) {
@@ -1108,9 +1105,38 @@ export const useAppStore = create<AppStore>()(
     // Cascade cleanup for returns
     if (module === 'returns') {
       const returnIds = oldData.map((r: any) => r.id);
-      await updateSetNullFromSupabase('treasury-transactions', 'linked_return_id', returnIds);
+      // Reverse stock restored by returns
+      oldData.forEach((ret: any) => {
+        (ret.items || []).forEach((item: any) => {
+          if (item.condition === 'good' || !item.condition) {
+            const product = get().products.find(p => p.id === item.productId);
+            if (product) get().updateProduct(product.id, { stock: Math.max(0, (product.stock || 0) - item.quantity) });
+          }
+        });
+      });
+      // Remove return stock movements
+      const stockMovementIds = get().stockMovements.filter(m => m.referenceType === 'return' && returnIds.includes(m.referenceId)).map(m => m.id);
+      await batchDeleteFromSupabase('stock-movements', stockMovementIds);
+      set((state) => ({
+        stockMovements: state.stockMovements.filter(m => !(m.referenceType === 'return' && returnIds.includes(m.referenceId))),
+      }));
+      // Delete linked treasury refund transactions and restore account balances
+      const linkedRefundTxs = get().treasuryTransactions.filter(tx => returnIds.includes(tx.linkedReturnId));
+      const linkedTxIds = linkedRefundTxs.map(tx => tx.id);
+      linkedRefundTxs.forEach(tx => {
+        const acc = get().treasuryAccounts.find(a => a.id === tx.accountId);
+        if (acc) get().updateTreasuryAccount(tx.accountId, { balance: (acc.balance || 0) + tx.amount });
+      });
+      await batchDeleteFromSupabase('treasury-transactions', linkedTxIds);
+      // Delete return items
       const returnItemIds = oldData.flatMap((r: any) => (r.items || []).map((item: any) => item.id));
       await batchDeleteFromSupabase('return-items', returnItemIds);
+      // Remove refund customer statements
+      const refundStmtIds = get().customerStatements.filter(s => returnIds.includes(s.referenceNumber)).map(s => s.id);
+      set((state) => ({
+        customerStatements: state.customerStatements.filter(s => !returnIds.includes(s.referenceNumber)),
+      }));
+      await batchDeleteFromSupabase('customerStatements', refundStmtIds);
     }
     // Cascade cleanup for customers
     if (module === 'customers') {

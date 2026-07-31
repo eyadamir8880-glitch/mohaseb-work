@@ -22,17 +22,26 @@ export default function ReportsPage() {
     });
   }, [store.treasuryTransactions, dateFrom, dateTo]);
 
+  const refundsByInvoice = useMemo(() => {
+    const map = new Map<string, number>();
+    store.returns.forEach(r => {
+      if (r.originalInvoiceId) map.set(r.originalInvoiceId, (map.get(r.originalInvoiceId) || 0) + (r.refundAmount || 0));
+    });
+    return map;
+  }, [store.returns]);
+
   const agedReceivables = useMemo(() => {
     const now = new Date();
     return store.customers.map(customer => {
       const unpaidInvoices = store.invoices.filter(
-        inv => inv.customerId === customer.id && (inv.status === 'sent' || inv.status === 'overdue' || inv.status === 'partially_paid')
+        inv => inv.customerId === customer.id && (inv.status === 'sent' || inv.status === 'overdue' || inv.status === 'partially_paid' || inv.status === 'partially_returned')
       );
       let current = 0, days31to60 = 0, days61to90 = 0, over90 = 0;
       unpaidInvoices.forEach(inv => {
         const dueDate = new Date(inv.dueDate);
         const daysOverdue = Math.floor((now.getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24));
-        const remaining = inv.grandTotal - inv.paidAmount;
+        const refunded = refundsByInvoice.get(inv.id) || 0;
+        const remaining = Math.max(0, inv.grandTotal - inv.paidAmount - refunded);
         if (daysOverdue <= 30) current += remaining;
         else if (daysOverdue <= 60) days31to60 += remaining;
         else if (daysOverdue <= 90) days61to90 += remaining;
@@ -40,28 +49,71 @@ export default function ReportsPage() {
       });
       return { customer, current, days31to60, days61to90, over90, totalDue: current + days31to60 + days61to90 + over90 };
     }).filter(r => r.totalDue > 0);
-  }, [store.customers, store.invoices]);
+  }, [store.customers, store.invoices, refundsByInvoice]);
 
   const cashFlow = useMemo(() => {
+    const allTx = store.treasuryTransactions;
     const operatingIncome = filteredTransactions.filter(t => t.type === 'income').reduce((s, t) => s + t.amount, 0);
     const operatingExpenses = filteredTransactions.filter(t => t.type === 'expense').reduce((s, t) => s + t.amount, 0);
     const transfers = filteredTransactions.filter(t => t.type === 'transfer');
 
     const netOperating = operatingIncome - operatingExpenses;
 
+    // Cash position before/after the period: manual account opening balances + transaction flow
+    const flowBefore = (d: Date) => allTx.reduce((sum, t) => {
+      if (t.type === 'transfer') return sum;
+      if (new Date(t.date).getTime() < d.getTime()) return t.type === 'income' ? sum + t.amount : sum - t.amount;
+      return sum;
+    }, 0);
+    const flowUntil = (d: Date) => allTx.reduce((sum, t) => {
+      if (t.type === 'transfer') return sum;
+      if (new Date(t.date).getTime() <= d.getTime()) return t.type === 'income' ? sum + t.amount : sum - t.amount;
+      return sum;
+    }, 0);
+
     const currentBalance = store.treasuryAccounts.reduce((s, a) => s + (a.balance || 0), 0);
-    const totalAccountsOpening = currentBalance - netOperating;
-    const totalAccountsClosing = currentBalance;
+    const totalFlow = flowUntil(new Date('9999-12-31'));
+    const manualOpeningBalances = currentBalance - totalFlow;
+
+    const openingCash = manualOpeningBalances + flowBefore(new Date(dateFrom));
+    const closingCash = manualOpeningBalances + flowUntil(new Date(dateTo + 'T23:59:59'));
 
     return {
       operatingIncome,
       operatingExpenses,
       netOperating,
       transfers,
-      openingCash: totalAccountsOpening,
-      closingCash: totalAccountsClosing,
+      openingCash,
+      closingCash,
     };
-  }, [filteredTransactions, store.treasuryAccounts]);
+  }, [filteredTransactions, store.treasuryTransactions, store.treasuryAccounts, dateFrom, dateTo]);
+
+  const treasuryByAccount = useMemo(() => {
+    const map = new Map<string, { income: number; expense: number }>();
+    filteredTransactions.forEach(t => {
+      if (t.type === 'transfer') return;
+      const acc = store.treasuryAccounts.find(a => a.id === t.accountId);
+      const key = acc ? (language === 'ar' ? (acc.nameAr || acc.name) : acc.name) : t.accountId || t.description;
+      const entry = map.get(key) || { income: 0, expense: 0 };
+      if (t.type === 'income') entry.income += t.amount;
+      else entry.expense += t.amount;
+      map.set(key, entry);
+    });
+    return Array.from(map.entries());
+  }, [filteredTransactions, store.treasuryAccounts, language]);
+
+  const treasuryByMethod = useMemo(() => {
+    const map = new Map<string, { income: number; expense: number }>();
+    filteredTransactions.forEach(t => {
+      if (t.type === 'transfer') return;
+      const key = t.paymentMethodDetail || t.paymentMethod || '—';
+      const entry = map.get(key) || { income: 0, expense: 0 };
+      if (t.type === 'income') entry.income += t.amount;
+      else entry.expense += t.amount;
+      map.set(key, entry);
+    });
+    return Array.from(map.entries());
+  }, [filteredTransactions]);
 
   const exportReport = () => {
     let data: Record<string, any>[] = [];
@@ -83,6 +135,13 @@ export default function ReportsPage() {
         { category: t('reports.operatingActivities'), item: t('reports.netCashFlow'), amount: cashFlow.netOperating },
         { category: t('reports.summary'), item: t('reports.beginningCash'), amount: cashFlow.openingCash },
         { category: t('reports.summary'), item: t('reports.endingCash'), amount: cashFlow.closingCash },
+        ...treasuryByAccount.map(([account, v]) => ({ category: t('reports.treasuryBreakdown'), item: account, amount: v.income - v.expense })),
+        ...treasuryByMethod.map(([method, v]) => ({ category: t('treasury.paymentMethodBreakdown'), item: method, amount: v.income - v.expense })),
+      ];
+    } else if (activeTab === 'treasuryBreakdown') {
+      data = [
+        ...treasuryByAccount.map(([account, v]) => ({ category: t('reports.treasuryBreakdown'), item: account, income: v.income, expense: v.expense, net: v.income - v.expense })),
+        ...treasuryByMethod.map(([method, v]) => ({ category: t('treasury.paymentMethodBreakdown'), item: method, income: v.income, expense: v.expense, net: v.income - v.expense })),
       ];
     } else if (activeTab === 'inventoryValuation') {
       data = store.products.map(p => ({
@@ -139,6 +198,7 @@ export default function ReportsPage() {
         <TabsList className="flex-wrap">
           <TabsTrigger value="agedReceivables">{t('reports.agedReceivables')}</TabsTrigger>
           <TabsTrigger value="cashFlow">{t('reports.cashFlow')}</TabsTrigger>
+          <TabsTrigger value="treasuryBreakdown">{t('reports.treasuryBreakdown')}</TabsTrigger>
           <TabsTrigger value="inventoryValuation">{t('reports.inventoryValuation')}</TabsTrigger>
         </TabsList>
 
@@ -241,10 +301,67 @@ export default function ReportsPage() {
           )}
         </TabsContent>
 
+        <TabsContent value="treasuryBreakdown" className="mt-4">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <div className="card">
+              <h3 className="card-title mb-4">{t('reports.treasuryBreakdown')} — {t('app.account')}</h3>
+              <table className="data-table w-full">
+                <thead>
+                  <tr>
+                    <th>{t('app.account')}</th>
+                    <th className="text-right">{t('treasury.income')}</th>
+                    <th className="text-right">{t('treasury.expense')}</th>
+                    <th className="text-right">{t('reports.netCashFlow')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {treasuryByAccount.length === 0 && (
+                    <tr><td colSpan={4} className="py-8 text-center text-sm text-slate-500">{t('app.noData')}</td></tr>
+                  )}
+                  {treasuryByAccount.map(([account, v]) => (
+                    <tr key={account}>
+                      <td>{account}</td>
+                      <td className="text-right text-emerald-600">{formatCurrency(v.income, 'EGP', language)}</td>
+                      <td className="text-right text-red-600">{formatCurrency(v.expense, 'EGP', language)}</td>
+                      <td className="text-right font-medium">{formatCurrency(v.income - v.expense, 'EGP', language)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="card">
+              <h3 className="card-title mb-4">{t('treasury.paymentMethodBreakdown')}</h3>
+              <table className="data-table w-full">
+                <thead>
+                  <tr>
+                    <th>{t('treasury.paymentMethod')}</th>
+                    <th className="text-right">{t('treasury.income')}</th>
+                    <th className="text-right">{t('treasury.expense')}</th>
+                    <th className="text-right">{t('reports.netCashFlow')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {treasuryByMethod.length === 0 && (
+                    <tr><td colSpan={4} className="py-8 text-center text-sm text-slate-500">{t('app.noData')}</td></tr>
+                  )}
+                  {treasuryByMethod.map(([method, v]) => (
+                    <tr key={method}>
+                      <td>{method}</td>
+                      <td className="text-right text-emerald-600">{formatCurrency(v.income, 'EGP', language)}</td>
+                      <td className="text-right text-red-600">{formatCurrency(v.expense, 'EGP', language)}</td>
+                      <td className="text-right font-medium">{formatCurrency(v.income - v.expense, 'EGP', language)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </TabsContent>
+
         <TabsContent value="inventoryValuation" className="mt-4">
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div className="kpi-card">
-              <p className="kpi-label">{t('warehouse.totalSKUs')}</p>
+              <p className="kpi-label">{t('warehouse.totalProducts')}</p>
               <p className="kpi-value">{store.products.length}</p>
             </div>
             <div className="kpi-card">

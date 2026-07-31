@@ -53,19 +53,25 @@ export default function CustomerAccountPage() {
 
     let openingBalance = 0;
 
-    customerInvoices.forEach(inv => {
-      const total = inv.grandTotal;
+    const activeInvoices = customerInvoices.filter(i => i.status !== 'draft' && i.status !== 'cancelled');
+    const inactiveNumbers = new Set(
+      customerInvoices.filter(i => i.status === 'draft' || i.status === 'cancelled').map(i => i.invoiceNumber)
+    );
+
+    activeInvoices.forEach(inv => {
       rows.push({
         date: inv.issueDate,
         reference: inv.invoiceNumber,
         description: `Invoice ${inv.invoiceNumber}`,
         descriptionAr: `فاتورة ${inv.invoiceNumber}`,
-        debit: total,
+        debit: inv.grandTotal,
         credit: 0,
         type: 'invoice',
       });
 
-      if (inv.payments?.length) {
+      // Legacy fallback: payments not yet captured as statement 'payment' rows
+      const hasStatementPayments = statements.some(s => s.type === 'payment' && s.referenceNumber === inv.invoiceNumber);
+      if (!hasStatementPayments && inv.payments?.length) {
         inv.payments.forEach((p: any) => {
           rows.push({
             date: p.paidAt?.split('T')[0] || inv.issueDate,
@@ -81,11 +87,12 @@ export default function CustomerAccountPage() {
     });
 
     statements.forEach(s => {
-      if (s.type === 'invoice') return; // invoices processed via customerInvoices
+      if (s.type === 'invoice') return; // invoices processed via activeInvoices
       if (s.type === 'opening_balance') {
         openingBalance = s.debit - s.credit;
         return;
       }
+      if (inactiveNumbers.has(s.referenceNumber)) return; // payments/refunds for draft/cancelled invoices
       rows.push({
         date: s.date,
         reference: s.referenceNumber,
@@ -99,29 +106,30 @@ export default function CustomerAccountPage() {
 
     rows.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
-    const totalDebit = rows.reduce((s, r) => s + r.debit, 0);
-    const totalCredit = rows.reduce((s, r) => s + r.credit, 0);
-    let runningBalance = openingBalance;
-
-    const withBalance = rows.map(r => {
-      runningBalance += r.debit - r.credit;
-      return { ...r, balance: runningBalance };
-    });
-
-    return {
-      rows: withBalance,
-      openingBalance,
-      totalDebit,
-      totalCredit,
-      closingBalance: openingBalance + totalDebit - totalCredit,
-    };
+    return { rows, openingBalance };
   }, [customerInvoices, statements]);
 
   const filteredRows = useMemo(() => {
     let result = transactionRows.rows;
     if (dateFrom) result = result.filter(r => r.date >= dateFrom);
     if (dateTo) result = result.filter(r => r.date <= dateTo);
-    return result;
+
+    const totalDebit = result.reduce((s, r) => s + r.debit, 0);
+    const totalCredit = result.reduce((s, r) => s + r.credit, 0);
+    let runningBalance = transactionRows.openingBalance;
+
+    const withBalance = result.map(r => {
+      runningBalance += r.debit - r.credit;
+      return { ...r, balance: runningBalance };
+    });
+
+    return {
+      rows: withBalance,
+      openingBalance: transactionRows.openingBalance,
+      totalDebit,
+      totalCredit,
+      closingBalance: transactionRows.openingBalance + totalDebit - totalCredit,
+    };
   }, [transactionRows, dateFrom, dateTo]);
 
   return (
@@ -216,16 +224,16 @@ export default function CustomerAccountPage() {
             </div>
             <div className="card p-4">
               <p className="text-xs text-slate-500">{t('customerAccount.openingBalance')}</p>
-              <p className="text-lg font-semibold mt-1">{formatCurrency(transactionRows.openingBalance, 'EGP', language)}</p>
+              <p className="text-lg font-semibold mt-1">{formatCurrency(filteredRows.openingBalance, 'EGP', language)}</p>
             </div>
             <div className="card p-4">
               <p className="text-xs text-slate-500">{t('customerAccount.totalDebit')}</p>
-              <p className="text-lg font-semibold mt-1 text-red-600">{formatCurrency(transactionRows.totalDebit, 'EGP', language)}</p>
+              <p className="text-lg font-semibold mt-1 text-red-600">{formatCurrency(filteredRows.totalDebit, 'EGP', language)}</p>
             </div>
             <div className="card p-4">
               <p className="text-xs text-slate-500">{t('customerAccount.closingBalance')}</p>
-              <p className={`text-lg font-semibold mt-1 ${transactionRows.closingBalance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {formatCurrency(transactionRows.closingBalance, 'EGP', language)}
+              <p className={`text-lg font-semibold mt-1 ${filteredRows.closingBalance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {formatCurrency(filteredRows.closingBalance, 'EGP', language)}
               </p>
             </div>
           </div>
@@ -244,12 +252,12 @@ export default function CustomerAccountPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredRows.length === 0 && (
+                  {filteredRows.rows.length === 0 && (
                     <tr>
                       <td colSpan={6} className="p-6 text-center text-sm text-slate-400">{t('customerAccount.noTransactions')}</td>
                     </tr>
                   )}
-                  {filteredRows.map((row, idx) => (
+                  {filteredRows.rows.map((row, idx) => (
                     <tr key={idx} className={`border-b hover:bg-slate-50 ${row.type === 'opening_balance' ? 'bg-slate-50 font-medium' : ''}`}>
                       <td className="p-3 text-xs text-slate-600">{formatDate(row.date, language)}</td>
                       <td className="p-3 text-xs font-mono text-blue-600">{row.reference}</td>
@@ -266,9 +274,9 @@ export default function CustomerAccountPage() {
                 <tfoot>
                   <tr className="bg-slate-100 font-semibold">
                     <td colSpan={3} className="p-3 text-xs">{t('customerAccount.totalDebit')}</td>
-                    <td className="p-3 text-xs text-right font-mono">{formatCurrency(transactionRows.totalDebit, 'EGP', language)}</td>
-                    <td className="p-3 text-xs text-right font-mono">{formatCurrency(transactionRows.totalCredit, 'EGP', language)}</td>
-                    <td className="p-3 text-xs text-right font-mono">{formatCurrency(transactionRows.closingBalance, 'EGP', language)}</td>
+                    <td className="p-3 text-xs text-right font-mono">{formatCurrency(filteredRows.totalDebit, 'EGP', language)}</td>
+                    <td className="p-3 text-xs text-right font-mono">{formatCurrency(filteredRows.totalCredit, 'EGP', language)}</td>
+                    <td className="p-3 text-xs text-right font-mono">{formatCurrency(filteredRows.closingBalance, 'EGP', language)}</td>
                   </tr>
                 </tfoot>
               </table>

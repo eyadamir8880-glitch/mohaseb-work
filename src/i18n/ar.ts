@@ -127,6 +127,7 @@ const ar = {
     quantity: 'الكمية',
     price: 'السعر',
     total: 'الإجمالي',
+    maxQty: 'الحد الأقصى',
     addItem: 'إضافة بند',
     removeItem: 'إزالة بند',
     statuses: { draft: 'مسودة', sent: 'مرسلة', paid: 'مدفوعة', partially_paid: 'مدفوعة جزئياً', overdue: 'متأخرة', cancelled: 'ملغاة', partially_returned: 'مرتجعة جزئياً', fully_returned: 'مرتجعة بالكامل' },
@@ -247,6 +248,7 @@ const ar = {
     bad: 'تالف',
     refundAmount: 'مبلغ الاسترداد',
     returnNumber: 'رقم المرتجع',
+    refundMethod: 'طريقة الاسترداد',
   },
 
   treasury: {

@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { useLanguage } from '@/providers/language-provider';
 import { useAppStore } from '@/stores/use-app-store';
-import { formatCurrency, formatDate, getStatusColor, generateId } from '@/lib/utils';
+import { formatCurrency, formatDate, getStatusColor, getStatusTranslation, generateId } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import { Input } from '@/components/ui/input';
@@ -30,6 +30,9 @@ export default function ReturnsPage() {
       return inv?.invoiceNumber || '-';
     }},
     { key: 'refundAmount', header: t('returns.refundAmount'), render: (item: any) => formatCurrency(item.refundAmount, 'EGP', language) },
+    { key: 'status', header: t('app.status'), render: (item: any) => (
+      <span className={`badge ${getStatusColor(item.status)}`}>{getStatusTranslation(item.status, language)}</span>
+    )},
     { key: 'condition', header: t('returns.condition'), render: (item: any) => (
       <span className={`badge ${item.condition === 'good' ? 'badge-green' : 'badge-red'}`}>
         {item.condition === 'good' ? t('returns.good') : t('returns.bad')}
@@ -84,34 +87,49 @@ export default function ReturnsPage() {
 function ReturnForm({ onSave, onCancel }: { onSave: () => void; onCancel: () => void }) {
   const { t, language } = useLanguage();
   const store = useAppStore();
-  const { invoices } = store;
+  const { invoices, returns } = store;
   const [originalInvoiceId, setOriginalInvoiceId] = useState('');
   const [condition, setCondition] = useState<'good' | 'bad'>('good');
   const [reason, setReason] = useState('');
+  const [refundMethod, setRefundMethod] = useState('cash');
   const [items, setItems] = useState<any[]>([]);
 
-  const selectedInvoice = invoices.find(i => i.id === originalInvoiceId);
+  const effectiveUnitPrice = (item: any) => {
+    if (item.lineTotal && item.quantity) return item.lineTotal / item.quantity;
+    return (item.unitPrice || 0) * (1 - (item.discountPercent || 0) / 100);
+  };
 
-  const loadInvoiceItems = () => {
-    if (selectedInvoice) {
-      setItems(selectedInvoice.items.map(item => ({ ...item, returnQty: 0, refundAmount: 0 })));
-    }
+  const lineRefund = (item: any) => Math.round(effectiveUnitPrice(item) * item.returnQty * 100) / 100;
+
+  const handleInvoiceChange = (e: any) => {
+    const invoiceId = e.target.value;
+    setOriginalInvoiceId(invoiceId);
+    const invoice = invoices.find(i => i.id === invoiceId);
+    setItems(invoice ? invoice.items.map(item => ({ ...item, returnQty: 0 })) : []);
   };
 
   const handleSave = () => {
     const returnItems = items.filter(i => i.returnQty > 0).map(i => ({
       id: generateId(), productId: i.productId, variantId: i.variantId,
       productName: i.productName, productNameAr: i.productNameAr, sku: i.sku,
-      quantity: i.returnQty, unitPrice: i.unitPrice || 0,
-      refundAmount: (i.unitPrice || 0) * i.returnQty, condition, reason,
+      quantity: i.returnQty, unitPrice: effectiveUnitPrice(i),
+      refundAmount: lineRefund(i), condition, reason,
     }));
 
     const totalRefund = returnItems.reduce((s, i) => s + i.refundAmount, 0);
 
+    const nextReturnNumber = (() => {
+      const max = returns.reduce((m, r) => {
+        const n = parseInt(String(r.returnNumber || '').replace(/^RET-(\d+)$/i, '$1'), 10);
+        return Number.isFinite(n) && n > m ? n : m;
+      }, 0);
+      return `RET-${String(max + 1).padStart(3, '0')}`;
+    })();
+
     store.addReturn({
-      returnNumber: `RET-${String(store.returns.length + 1).padStart(3, '0')}`,
+      returnNumber: nextReturnNumber,
       type: 'customer', originalInvoiceId,
-      items: returnItems, refundAmount: totalRefund, refundMethod: 'cash',
+      items: returnItems, refundAmount: totalRefund, refundMethod,
       status: 'completed',
     });
 
@@ -120,11 +138,8 @@ function ReturnForm({ onSave, onCancel }: { onSave: () => void; onCancel: () => 
 
   return (
     <div className="space-y-4">
-      <Select label={t('returns.originalInvoice')} value={originalInvoiceId} onChange={(e) => { setOriginalInvoiceId(e.target.value); }} placeholder={t('app.search')}
-        options={invoices.filter(i => ['sent', 'partially_paid', 'paid'].includes(i.status)).map(inv => ({ value: inv.id, label: `${inv.invoiceNumber} - ${formatCurrency(inv.grandTotal, 'EGP', language)}` }))} />
-      {originalInvoiceId && (
-        <Button variant="outline" size="sm" onClick={loadInvoiceItems}>{t('invoices.items')}</Button>
-      )}
+      <Select label={t('returns.originalInvoice')} value={originalInvoiceId} onChange={handleInvoiceChange} placeholder={t('app.search')}
+        options={invoices.filter(i => ['sent', 'partially_paid', 'paid', 'partially_returned'].includes(i.status)).map(inv => ({ value: inv.id, label: `${inv.invoiceNumber} - ${formatCurrency(inv.grandTotal, 'EGP', language)}` }))} />
 
       {items.length > 0 && (
         <div className="space-y-2">
@@ -133,13 +148,17 @@ function ReturnForm({ onSave, onCancel }: { onSave: () => void; onCancel: () => 
             <div key={idx} className="flex items-center gap-3 rounded-lg border p-3 dark:border-slate-700">
               <div className="flex-1">
                 <p className="text-sm font-medium">{language === 'ar' ? item.productNameAr : item.productName}</p>
-                <p className="text-xs text-slate-500">{item.sku} | {t('invoices.unitPrice')}: {formatCurrency(item.unitPrice, 'EGP', language)}</p>
+                <p className="text-xs text-slate-500">{item.sku} | {t('invoices.unitPrice')}: {formatCurrency(effectiveUnitPrice(item), 'EGP', language)} | {t('invoices.maxQty')}: {item.quantity}</p>
+                {item.returnQty > 0 && (
+                  <p className="text-xs text-emerald-600 mt-0.5">{t('returns.refundAmount')}: {formatCurrency(lineRefund(item), 'EGP', language)}</p>
+                )}
               </div>
-              <Input type="number" className="w-20" placeholder={t('invoices.quantity')}
+              <Input type="number" className="w-20" min={0} max={item.quantity} placeholder={t('invoices.quantity')}
                 value={item.returnQty || 0}
                 onChange={(e) => {
                   const newItems = [...items];
-                  newItems[idx] = { ...item, returnQty: parseInt(e.target.value) || 0 };
+                  const val = parseInt(e.target.value) || 0;
+                  newItems[idx] = { ...item, returnQty: Math.min(Math.max(val, 0), item.quantity) };
                   setItems(newItems);
                 }} />
             </div>
@@ -152,7 +171,10 @@ function ReturnForm({ onSave, onCancel }: { onSave: () => void; onCancel: () => 
           { value: 'good', label: t('returns.good') },
           { value: 'bad', label: t('returns.bad') },
         ]} />
-      
+
+      <Select label={t('returns.refundMethod')} value={refundMethod} onChange={(e) => setRefundMethod(e.target.value)}
+        options={store.paymentMethods.filter(p => p.isActive !== false).map(m => ({ value: m.id, label: language === 'ar' ? m.nameAr : m.name }))} />
+
       <Input label={t('returns.reason')} value={reason} onChange={(e) => setReason(e.target.value)} />
 
       <div className="flex justify-end gap-2">
