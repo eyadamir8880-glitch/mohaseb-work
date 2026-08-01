@@ -334,7 +334,7 @@ export default function ProductsPage() {
                 </svg>
               </button>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Input label={t('products.name')} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
               <Input label="SKU" value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} />
               <Input label={t('products.barcode')} value={form.barcode} onChange={(e) => setForm({ ...form, barcode: e.target.value })} />
@@ -497,7 +497,7 @@ export default function ProductsPage() {
                     {t('import.selectAll')}
                   </label>
                 </div>
-                <div className="max-h-64 overflow-y-auto border rounded-lg">
+                <div className="max-h-64 overflow-auto border rounded-lg">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b bg-muted/50">

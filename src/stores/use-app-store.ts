@@ -39,12 +39,14 @@ interface AppStore {
   fiscalYears: FiscalYear[];
 
   sidebarCollapsed: boolean;
+  mobileSidebarOpen: boolean;
   isInitialized: boolean;
   lastSaveTime: number | null;
 
   setLanguage: (lang: 'en' | 'ar') => void;
   setTheme: (theme: 'light' | 'dark') => void;
   toggleSidebar: () => void;
+  setMobileSidebarOpen: (open: boolean) => void;
 
   initializeStore: () => Promise<void>;
   resetToDemo: () => void;
@@ -219,12 +221,14 @@ export const useAppStore = create<AppStore>()(
   customerStatements: [],
   fiscalYears: [],
   sidebarCollapsed: false,
+  mobileSidebarOpen: false,
   isInitialized: false,
   lastSaveTime: null,
 
   setLanguage: (lang: 'en' | 'ar') => set({ language: lang }),
   setTheme: (theme: 'light' | 'dark') => set({ theme }),
   toggleSidebar: () => set((state: any) => ({ sidebarCollapsed: !state.sidebarCollapsed })),
+  setMobileSidebarOpen: (open: boolean) => set({ mobileSidebarOpen: open }),
 
   initializeStore: async () => {
     const modules = [
@@ -1254,7 +1258,7 @@ export const useAppStore = create<AppStore>()(
   name: 'mohasebeyad-storage',
   storage: createJSONStorage(() => safeStorage),
   partialize: (state: any) => {
-    const { setLanguage, setTheme, toggleSidebar, initializeStore, resetToDemo,
+    const { setLanguage, setTheme, toggleSidebar, setMobileSidebarOpen, mobileSidebarOpen, initializeStore, resetToDemo,
             getStateSnapshot, loadState, addAuditLog, ...data } = state;
     return data;
   },

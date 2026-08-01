@@ -148,7 +148,7 @@ function CustomerForm({ customerId, onSave, onCancel }: { customerId: string | n
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Input label={t('customers.name')} value={name} onChange={(e) => setName(e.target.value)} />
         <Input label={t('customers.phone')} value={phone} onChange={(e) => setPhone(e.target.value)} />
         <Input label={t('customers.email')} type="email" value={email} onChange={(e) => setEmail(e.target.value)} />

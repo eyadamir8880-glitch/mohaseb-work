@@ -35,6 +35,7 @@ const en = {
     apply: 'Apply',
     reset: 'Reset',
     close: 'Close',
+    toggleSidebar: 'Toggle sidebar',
     confirm: 'Confirm',
     submit: 'Submit',
     add: 'Add',

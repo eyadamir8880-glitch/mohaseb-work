@@ -35,6 +35,7 @@ const ar = {
     apply: 'تطبيق',
     reset: 'إعادة تعيين',
     close: 'إغلاق',
+    toggleSidebar: 'فتح/إغلاق القائمة',
     confirm: 'تأكيد',
     submit: 'إرسال',
     add: 'إضافة',

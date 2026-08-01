@@ -487,7 +487,7 @@ export default function InvoicesPage() {
 
       <Modal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} title={t('invoices.addNew')} size="full">
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input label={t('invoices.invoiceNumber')} value={createForm.invoiceNumber}
               onChange={(e) => setCreateForm({ ...createForm, invoiceNumber: e.target.value })} />
             <Select label={t('invoices.customer')} value={createForm.customerId}
@@ -528,7 +528,7 @@ export default function InvoicesPage() {
                         p.sku.toLowerCase().includes(q);
                     });
                     return (
-                    <div className="absolute z-50 top-full mt-1 w-[800px] bg-white dark:bg-gray-800 border rounded-md shadow-lg overflow-auto" style={{ maxHeight: 'calc(95vh - 120px)' }}>
+                    <div className="absolute z-50 top-full mt-1 w-[800px] max-w-[calc(100vw-2rem)] bg-white dark:bg-gray-800 border rounded-md shadow-lg overflow-auto" style={{ maxHeight: 'calc(95vh - 120px)' }}>
                       <div className="grid grid-cols-[1fr_100px_100px] gap-2 px-3 py-2 bg-gray-100 dark:bg-gray-700 text-xs font-semibold text-gray-500 dark:text-gray-400 sticky top-0">
                         <span>{t('app.name')}</span>
                         <span className="text-right">{t('invoices.unitPrice')}</span>
@@ -603,7 +603,7 @@ export default function InvoicesPage() {
       <Modal isOpen={showPaymentModal} onClose={() => { setShowPaymentModal(false); setSelectedInvoice(null); }} title={t('invoices.paymentModal.title')} size="default">
         {selectedInvoice && (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
               <div>
                 <span className="text-muted-foreground">{t.invoices.invoiceNumber}:</span>
                 <span className="ml-2 font-medium">{selectedInvoice.invoiceNumber}</span>
@@ -642,7 +642,7 @@ export default function InvoicesPage() {
       <Modal isOpen={showViewModal} onClose={() => { setShowViewModal(false); setSelectedInvoice(null); }} title={t('invoices.invoiceDetails') || 'Invoice Details'} size="wide">
         {selectedInvoice && (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
               <div><span className="text-muted-foreground">{t('invoices.invoiceNumber')}:</span> <span className="ml-2 font-medium">{selectedInvoice.invoiceNumber}</span></div>
               <div><span className="text-muted-foreground">{t('invoices.customer')}:</span> <span className="ml-2 font-medium">{getCustomerName(selectedInvoice.customerId)}</span></div>
               <div><span className="text-muted-foreground">{t('invoices.issueDate')}:</span> <span className="ml-2 font-medium">{formatDate(selectedInvoice.issueDate, locale)}</span></div>

@@ -530,7 +530,7 @@ CREATE TABLE stock_movements (
   date           date NOT NULL DEFAULT CURRENT_DATE,
   reference_type text NOT NULL DEFAULT '',
   reference_id   text NOT NULL DEFAULT '',
-  warehouse_id   uuid NOT NULL REFERENCES warehouses(id),
+  warehouse_id   uuid REFERENCES warehouses(id) ON DELETE SET NULL,
   created_at     timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_sm_product ON stock_movements(product_id);
@@ -607,7 +607,7 @@ CREATE TABLE customer_statements (
   id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   customer_id       uuid NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
   date              date NOT NULL DEFAULT CURRENT_DATE,
-  type              text NOT NULL CHECK (type IN ('invoice', 'payment', 'return', 'opening_balance')),
+  type              text NOT NULL CHECK (type IN ('invoice', 'payment', 'return', 'opening_balance', 'manual')),
   reference_number  text NOT NULL DEFAULT '',
   description       text NOT NULL DEFAULT '',
   description_ar    text NOT NULL DEFAULT '',
@@ -618,6 +618,19 @@ CREATE TABLE customer_statements (
 );
 CREATE INDEX idx_cs_customer ON customer_statements(customer_id);
 CREATE INDEX idx_cs_date ON customer_statements(date);
+
+-- Fiscal Years
+CREATE TABLE fiscal_years (
+  id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name       text NOT NULL,
+  name_ar    text NOT NULL DEFAULT '',
+  start_date date NOT NULL DEFAULT CURRENT_DATE,
+  end_date   date NOT NULL DEFAULT CURRENT_DATE,
+  is_closed  boolean NOT NULL DEFAULT false,
+  closed_at  timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_fy_start_date ON fiscal_years(start_date);
 
 -- Deferred circular foreign keys
 ALTER TABLE invoices ADD CONSTRAINT fk_invoices_treasury FOREIGN KEY (treasury_transaction_id) REFERENCES treasury_transactions(id);

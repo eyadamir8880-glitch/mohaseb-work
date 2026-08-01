@@ -151,7 +151,7 @@ export default function CustomerAccountPage() {
       </div>
 
       <div className="card p-5">
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <Select
             label={t('customerAccount.selectCustomer')}
             value={selectedCustomerId}
@@ -180,7 +180,7 @@ export default function CustomerAccountPage() {
           {showEntryForm && (
             <div className="card p-5">
               <h3 className="text-sm font-semibold mb-4">{t('customerAccount.addEntry')}</h3>
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <Input label={t('customerAccount.date')} type="date" value={entryDate} onChange={(e) => setEntryDate(e.target.value)} />
                 <Input label={t('customerAccount.reference')} value={entryRef} onChange={(e) => setEntryRef(e.target.value)} placeholder="e.g. MAN-001" />
                 <Select label={t('treasury.paymentMethod')} value={entryPaymentMethod} onChange={(e) => setEntryPaymentMethod(e.target.value)}

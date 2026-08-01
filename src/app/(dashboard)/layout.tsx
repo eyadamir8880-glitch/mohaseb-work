@@ -13,9 +13,9 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen" dir={language === 'ar' ? 'rtl' : 'ltr'}>
       <Sidebar />
-      <div className={`flex-1 transition-all duration-200 ${sidebarCollapsed ? 'ms-[70px]' : 'ms-[260px]'}`}>
+      <div className={`flex-1 transition-all duration-200 ${sidebarCollapsed ? 'lg:ms-[70px]' : 'lg:ms-[260px]'}`}>
         <Header />
-        <main className="p-6">
+        <main className="p-4 sm:p-6">
           {children}
         </main>
       </div>

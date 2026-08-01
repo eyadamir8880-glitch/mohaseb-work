@@ -89,7 +89,7 @@ export default function SettingsPage() {
         </TabsList>
 
         <TabsContent value="company" className="mt-4 space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input label="Company Name" value={getSetting('companyName')} onChange={(e) => updateSetting('companyName', e.target.value)} />
             <Input label="Company Name (AR)" value={getSetting('companyNameAr')} onChange={(e) => updateSetting('companyNameAr', e.target.value)} />
             <Input label="Phone" value={getSetting('companyPhone')} onChange={(e) => updateSetting('companyPhone', e.target.value)} />
@@ -103,7 +103,7 @@ export default function SettingsPage() {
         </TabsContent>
 
         <TabsContent value="invoice" className="mt-4 space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input label="Invoice Prefix" value={getSetting('invoicePrefix')} onChange={(e) => updateSetting('invoicePrefix', e.target.value)} />
           </div>
           <div>
@@ -135,7 +135,7 @@ export default function SettingsPage() {
           </div>
           <div className="border-t pt-4 dark:border-slate-700">
             <p className="text-sm font-medium mb-2">Add Custom Payment Method</p>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               <Input label="Name" value={newPmName} onChange={(e) => setNewPmName(e.target.value)} />
               <Select options={[
                 { value: 'vodafone_cash', label: 'Vodafone Cash' },
@@ -156,7 +156,7 @@ export default function SettingsPage() {
         </TabsContent>
 
         <TabsContent value="data" className="mt-4 space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div className="card">
               <h3 className="card-title mb-2">{t('common.saveSession')}</h3>
               <p className="mb-4 text-sm text-slate-500">Download current state as JSON backup</p>

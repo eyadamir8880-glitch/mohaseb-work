@@ -321,7 +321,7 @@ function TransactionForm({ transactionId, onSave, onCancel }: { transactionId: s
           { value: 'transfer', label: t('treasury.transfer') },
         ]} />
       
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Input label={t('invoices.paymentModal.amount')} type="number" value={amount} onChange={(e) => setAmount(e.target.value)} />
         <Input label={t('invoices.paymentModal.date')} type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         
@@ -399,7 +399,7 @@ function AccountForm({ accountId, onSave, onCancel }: { accountId: string | null
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Input label={t('treasury.accountName') + ' (EN)'} value={name} onChange={(e) => setName(e.target.value)} />
         <Input label={t('treasury.accountName') + ' (AR)'} value={nameAr} onChange={(e) => setNameAr(e.target.value)} />
         <Select label={t('reports.accountType')} value={type} onChange={(e) => setType(e.target.value as any)}

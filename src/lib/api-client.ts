@@ -188,6 +188,38 @@ async function supabaseGet<T>(endpoint: string, params?: Record<string, any>): P
     if (data.length < PAGE_SIZE) break;
     from += PAGE_SIZE;
   }
+
+  // Attach child rows so parent collections keep their nested arrays
+  if (table === 'invoices' && allData.length > 0) {
+    const [{ data: items }, { data: payments }] = await Promise.all([
+      (getSupabase() as any).from('invoice_items').select('*'),
+      (getSupabase() as any).from('invoice_payments').select('*'),
+    ]);
+    const itemsByInvoice = (items || []).reduce((acc: any, r: any) => {
+      (acc[r.invoice_id] = acc[r.invoice_id] || []).push(r);
+      return acc;
+    }, {});
+    const paymentsByInvoice = (payments || []).reduce((acc: any, r: any) => {
+      (acc[r.invoice_id] = acc[r.invoice_id] || []).push(r);
+      return acc;
+    }, {});
+    allData = allData.map((inv: any) => ({
+      ...inv,
+      items: itemsByInvoice[inv.id] || [],
+      payments: paymentsByInvoice[inv.id] || [],
+    }));
+  } else if (table === 'returns' && allData.length > 0) {
+    const { data: items } = await (getSupabase() as any).from('return_items').select('*');
+    const itemsByReturn = (items || []).reduce((acc: any, r: any) => {
+      (acc[r.return_id] = acc[r.return_id] || []).push(r);
+      return acc;
+    }, {});
+    allData = allData.map((ret: any) => ({
+      ...ret,
+      items: itemsByReturn[ret.id] || [],
+    }));
+  }
+
   return snakeToCamel(allData) as any;
 }
 

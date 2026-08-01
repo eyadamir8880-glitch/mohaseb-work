@@ -139,11 +139,11 @@ export function DataTable<T extends Record<string, any>>({
         </table>
       </div>
       {totalPages > 1 && (
-        <div className="mt-4 flex items-center justify-between">
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
           <p className="text-sm text-slate-500">
             Page {currentPage} of {totalPages} ({sortedData.length} items)
           </p>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <button
               className="btn-outline btn-sm"
               disabled={currentPage === 1}

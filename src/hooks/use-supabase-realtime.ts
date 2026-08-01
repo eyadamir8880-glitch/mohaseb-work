@@ -24,6 +24,7 @@ const TABLE_MODULE_MAP: Record<string, string> = {
   discount_rules: 'discountRules',
   payment_methods: 'paymentMethods',
   customer_statements: 'customerStatements',
+  fiscal_years: 'fiscalYears',
   invoice_items: 'invoiceItems',
   invoice_payments: 'invoicePayments',
   return_items: 'returnItems',

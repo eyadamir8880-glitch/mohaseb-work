@@ -44,74 +44,84 @@ function NavIcon({ icon }: { icon: string }) {
 export function Sidebar() {
   const pathname = usePathname();
   const { language, t } = useLanguage();
-  const { sidebarCollapsed, toggleSidebar } = useAppStore();
+  const { sidebarCollapsed, toggleSidebar, mobileSidebarOpen, setMobileSidebarOpen } = useAppStore();
   const notifications = useAppStore((state) => state.notifications);
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
+  const closeMobile = () => setMobileSidebarOpen(false);
+
   return (
-    <aside
-      className={cn(
-        'fixed left-0 top-0 z-40 flex h-screen flex-col border-r bg-white transition-all duration-200 dark:bg-slate-900 dark:border-slate-700',
-        language === 'ar' ? 'left-auto right-0 border-l' : 'border-r',
-        sidebarCollapsed ? 'w-[70px]' : 'w-[260px]'
+    <>
+      {/* Backdrop for the mobile drawer */}
+      {mobileSidebarOpen && (
+        <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={closeMobile} />
       )}
-      dir={language === 'ar' ? 'rtl' : 'ltr'}
-    >
-      {/* Logo */}
-      <div className={cn('flex h-16 items-center border-b px-4 dark:border-slate-700', sidebarCollapsed ? 'justify-center' : 'justify-between')}>
-        {!sidebarCollapsed && (
-          <Link href="/dashboard" className="flex items-center gap-2">
+      <aside
+        className={cn(
+          'fixed top-0 z-50 flex h-screen flex-col bg-white transition-all duration-200 dark:bg-slate-900 dark:border-slate-700',
+          'w-[260px]',
+          language === 'ar' ? 'right-0 lg:border-l' : 'left-0 lg:border-r',
+          mobileSidebarOpen
+            ? 'translate-x-0'
+            : (language === 'ar' ? 'translate-x-full' : '-translate-x-full'),
+          'lg:translate-x-0',
+          sidebarCollapsed ? 'lg:w-[70px]' : 'lg:w-[260px]'
+        )}
+        dir={language === 'ar' ? 'rtl' : 'ltr'}
+      >
+        {/* Logo */}
+        <div className={cn('flex h-16 items-center border-b px-4 dark:border-slate-700', sidebarCollapsed ? 'lg:justify-center' : 'justify-between')}>
+          <Link href="/dashboard" onClick={closeMobile} className="flex items-center gap-2">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-sm font-bold text-white">
               M
             </div>
-            <span className="text-lg font-bold">{t('app.name')}</span>
+            <span className={cn('text-lg font-bold', sidebarCollapsed && 'lg:hidden')}>{t('app.name')}</span>
           </Link>
-        )}
-        {sidebarCollapsed && (
-          <Link href="/dashboard" className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600 text-sm font-bold text-white">
-            M
-          </Link>
-        )}
-        <button onClick={toggleSidebar} className="btn-ghost p-1.5 text-slate-400 hover:text-slate-600">
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d={sidebarCollapsed ? 'M13 5l7 7-7 7M5 5l7 7-7 7' : 'M11 19l-7-7 7-7m8 14l-7-7 7-7'} />
-          </svg>
-        </button>
-      </div>
+          <button onClick={toggleSidebar} className="btn-ghost p-1.5 text-slate-400 hover:text-slate-600 hidden lg:inline-flex" title={t('app.toggleSidebar')}>
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d={sidebarCollapsed ? 'M13 5l7 7-7 7M5 5l7 7-7 7' : 'M11 19l-7-7 7-7m8 14l-7-7 7-7'} />
+            </svg>
+          </button>
+          <button onClick={closeMobile} className="btn-ghost p-1.5 text-slate-400 hover:text-slate-600 lg:hidden" title={t('app.close')}>
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto p-3">
-        <ul className="space-y-1">
-          {navItems.map((item) => {
-            const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
-            return (
-              <li key={item.id}>
-                <Link
-                  href={item.href}
-                  className={cn(
-                    'sidebar-link',
-                    { 'active': isActive },
-                    sidebarCollapsed && 'justify-center px-2'
-                  )}
-                  title={language === 'ar' ? item.labelAr : item.labelEn}
-                >
-                  <NavIcon icon={item.icon} />
-                  {!sidebarCollapsed && (
-                    <span>{language === 'ar' ? item.labelAr : item.labelEn}</span>
-                  )}
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
-      </nav>
+        {/* Navigation */}
+        <nav className="flex-1 overflow-y-auto p-3">
+          <ul className="space-y-1">
+            {navItems.map((item) => {
+              const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+              return (
+                <li key={item.id}>
+                  <Link
+                    href={item.href}
+                    onClick={closeMobile}
+                    className={cn(
+                      'sidebar-link',
+                      { 'active': isActive },
+                      sidebarCollapsed && 'lg:justify-center lg:px-2'
+                    )}
+                    title={language === 'ar' ? item.labelAr : item.labelEn}
+                  >
+                    <NavIcon icon={item.icon} />
+                    <span className={cn(sidebarCollapsed && 'lg:hidden')}>
+                      {language === 'ar' ? item.labelAr : item.labelEn}
+                    </span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
 
-      {/* Footer */}
-      <div className={cn('border-t p-3 dark:border-slate-700', sidebarCollapsed && 'text-center')}>
-        {!sidebarCollapsed && (
-          <p className="text-xs text-slate-400">{t('app.tagline')}</p>
-        )}
-      </div>
-    </aside>
+        {/* Footer */}
+        <div className={cn('border-t p-3 dark:border-slate-700', sidebarCollapsed && 'lg:text-center')}>
+          <p className={cn('text-xs text-slate-400', sidebarCollapsed && 'lg:hidden')}>{t('app.tagline')}</p>
+        </div>
+      </aside>
+    </>
   );
 }
