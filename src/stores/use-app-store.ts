@@ -358,6 +358,8 @@ export const useAppStore = create<AppStore>()(
           lastSaveTime: Date.now(),
         } as any);
 
+        get().backfillProductSerials();
+
         get().addAuditLog({
           timestamp: new Date().toISOString(), user: 'System', action: 'created',
           module: 'system', recordId: 'init', oldValues: null,
@@ -380,6 +382,7 @@ export const useAppStore = create<AppStore>()(
         isInitialized: true,
       } as any);
     }
+    get().backfillProductSerials();
   },
 
   resetToDemo: () => {

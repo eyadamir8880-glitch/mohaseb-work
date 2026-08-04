@@ -126,7 +126,19 @@ export function useSupabaseRealtime() {
         }
         if (pendingIds.size === 0) pendingSyncIds.delete(module);
       }
-      useAppStore.setState({ [module]: [...pendingLocal, ...supabaseData] });
+      // Products: keep locally-assigned serial numbers when the DB hasn't
+      // migrated serial_number yet, so a refetch never wipes them.
+      let mergedSupabase = supabaseData;
+      if (module === 'products') {
+        mergedSupabase = supabaseData.map((r: any) => {
+          if (r.serialNumber == null) {
+            const local = localData.find((l: any) => l.id === r.id);
+            if (local && local.serialNumber != null) return { ...r, serialNumber: local.serialNumber };
+          }
+          return r;
+        });
+      }
+      useAppStore.setState({ [module]: [...pendingLocal, ...mergedSupabase] });
       pollTimestamps.current[module] = Date.now();
     };
 

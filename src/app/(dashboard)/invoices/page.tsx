@@ -521,12 +521,12 @@ export default function InvoicesPage() {
                   />
                   {focusedItemIndex === i && (() => {
                     const filtered = products.filter((p) => {
-                      const q = productSearch.toLowerCase();
+                      const q = productSearch.trim().toLowerCase();
                       if (!q) return true;
                       return p.name.toLowerCase().includes(q) ||
                         p.nameAr.toLowerCase().includes(q) ||
                         p.sku.toLowerCase().includes(q) ||
-                        (p.serialNumber !== undefined && String(p.serialNumber).includes(q));
+                        (p.serialNumber !== undefined && String(p.serialNumber) === q);
                     });
                     return (
                     <div className="absolute z-50 top-full mt-1 w-[800px] max-w-[calc(100vw-2rem)] bg-white dark:bg-gray-800 border rounded-md shadow-lg overflow-auto" style={{ maxHeight: 'calc(95vh - 120px)' }}>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo } from 'react';
 import { useLanguage } from '@/providers/language-provider';
 import { useAppStore } from '@/stores/use-app-store';
 import { Card, CardContent } from '@/components/ui/card';
@@ -38,19 +38,12 @@ export default function ProductsPage() {
 
   const filtered = useMemo(() => {
     return products.filter((p) => {
-      const q = search.toLowerCase();
-      const matchSearch = !q || p.name.toLowerCase().includes(q) || (p.nameAr && p.nameAr.toLowerCase().includes(q)) || p.sku.toLowerCase().includes(q) || (p.serialNumber !== undefined && String(p.serialNumber).includes(q));
+      const q = search.trim().toLowerCase();
+      const matchSearch = !q || p.name.toLowerCase().includes(q) || (p.nameAr && p.nameAr.toLowerCase().includes(q)) || p.sku.toLowerCase().includes(q) || (p.serialNumber !== undefined && String(p.serialNumber) === q);
       const matchCat = catFilter === 'all' || p.categoryId === catFilter;
       return matchSearch && matchCat;
     });
   }, [products, search, catFilter]);
-
-  const backfillRef = useRef(false);
-  useEffect(() => {
-    if (backfillRef.current || products.length === 0) return;
-    backfillRef.current = true;
-    store.backfillProductSerials();
-  }, [products, store]);
 
   const resetForm = () => setForm({
     name: '', sku: '', barcode: '', description: '',
