@@ -236,7 +236,6 @@ function TransactionForm({ transactionId, onSave, onCancel }: { transactionId: s
   const [toAccountId, setToAccountId] = useState(existing?.toAccountId || '');
   const [paymentMethod, setPaymentMethod] = useState(existing?.paymentMethod || store.paymentMethods[0]?.id || 'cash');
   const [description, setDescription] = useState(existing?.description || '');
-  const [descriptionAr, setDescriptionAr] = useState(existing?.descriptionAr || '');
   const [isRecurring, setIsRecurring] = useState(existing?.isRecurring || false);
   const [recurringPattern, setRecurringPattern] = useState(existing?.recurringPattern || 'monthly');
 
@@ -279,7 +278,7 @@ function TransactionForm({ transactionId, onSave, onCancel }: { transactionId: s
         fromAccountId: type === 'transfer' ? accountId : null,
         toAccountId: type === 'transfer' ? toAccountId : null,
         paymentMethod, paymentMethodDetail,
-        description, descriptionAr,
+        description, descriptionAr: description,
         isRecurring, recurringPattern: isRecurring ? recurringPattern : null, nextOccurrence: isRecurring ? date : null,
       });
     } else {
@@ -288,7 +287,7 @@ function TransactionForm({ transactionId, onSave, onCancel }: { transactionId: s
         fromAccountId: type === 'transfer' ? accountId : null,
         toAccountId: type === 'transfer' ? toAccountId : null,
         paymentMethod, paymentMethodDetail,
-        categoryId: '', description, descriptionAr,
+        categoryId: '', description, descriptionAr: description,
         referenceNumber: '', receiptUrl: '',
         linkedInvoiceId: null, linkedPOId: null, linkedReturnId: null,
         isRecurring, recurringPattern: isRecurring ? recurringPattern : null, nextOccurrence: isRecurring ? date : null,
@@ -344,8 +343,7 @@ function TransactionForm({ transactionId, onSave, onCancel }: { transactionId: s
         
         {type !== 'transfer' && (
           <>
-            <Input label={t('treasury.description') + ' (EN)'} value={description} onChange={(e) => setDescription(e.target.value)} />
-            <Input label={t('treasury.description') + ' (AR)'} value={descriptionAr} onChange={(e) => setDescriptionAr(e.target.value)} />
+            <Input label={t('treasury.description')} value={description} onChange={(e) => setDescription(e.target.value)} />
           </>
         )}
       </div>
@@ -375,12 +373,11 @@ function TransactionForm({ transactionId, onSave, onCancel }: { transactionId: s
 }
 
 function AccountForm({ accountId, onSave, onCancel }: { accountId: string | null; onSave: () => void; onCancel: () => void }) {
-  const { t, language } = useLanguage();
+  const { t } = useLanguage();
   const store = useAppStore();
   const existing = accountId ? store.treasuryAccounts.find(a => a.id === accountId) : null;
 
   const [name, setName] = useState(existing?.name || '');
-  const [nameAr, setNameAr] = useState(existing?.nameAr || '');
   const [type, setType] = useState(existing?.type || 'cash');
   const [currency, setCurrency] = useState(existing?.currency || 'EGP');
   const [isDefault, setIsDefault] = useState(existing?.isDefault || false);
@@ -390,9 +387,9 @@ function AccountForm({ accountId, onSave, onCancel }: { accountId: string | null
   const handleSave = () => {
     if (!isValid) return;
     if (existing) {
-      store.updateTreasuryAccount(existing.id, { name, nameAr, type, currency, isDefault });
+      store.updateTreasuryAccount(existing.id, { name, nameAr: name, type, currency, isDefault });
     } else {
-      store.addTreasuryAccount({ name, nameAr, type, balance: 0, currency, isDefault });
+      store.addTreasuryAccount({ name, nameAr: name, type, balance: 0, currency, isDefault });
     }
     onSave();
   };
@@ -400,8 +397,7 @@ function AccountForm({ accountId, onSave, onCancel }: { accountId: string | null
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Input label={t('treasury.accountName') + ' (EN)'} value={name} onChange={(e) => setName(e.target.value)} />
-        <Input label={t('treasury.accountName') + ' (AR)'} value={nameAr} onChange={(e) => setNameAr(e.target.value)} />
+        <Input label={t('treasury.accountName')} value={name} onChange={(e) => setName(e.target.value)} />
         <Select label={t('reports.accountType')} value={type} onChange={(e) => setType(e.target.value as any)}
           options={[
             { value: 'cash', label: t('treasury.cash') },

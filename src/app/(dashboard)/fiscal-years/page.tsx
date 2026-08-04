@@ -17,7 +17,7 @@ export default function FiscalYearsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [closeConfirmId, setCloseConfirmId] = useState<string | null>(null);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
-  const [form, setForm] = useState({ name: '', nameAr: '', startDate: '', endDate: '' });
+  const [form, setForm] = useState({ name: '', startDate: '', endDate: '' });
 
   const fiscalYears = useMemo(() =>
     [...store.fiscalYears].sort((a, b) => new Date(b.startDate).getTime() - new Date(a.startDate).getTime()),
@@ -26,13 +26,13 @@ export default function FiscalYearsPage() {
 
   const openCreate = () => {
     setEditingId(null);
-    setForm({ name: '', nameAr: '', startDate: '', endDate: '' });
+    setForm({ name: '', startDate: '', endDate: '' });
     setShowModal(true);
   };
 
   const openEdit = (fy: typeof store.fiscalYears[0]) => {
     setEditingId(fy.id);
-    setForm({ name: fy.name, nameAr: fy.nameAr, startDate: fy.startDate.split('T')[0], endDate: fy.endDate.split('T')[0] });
+    setForm({ name: fy.name, startDate: fy.startDate.split('T')[0], endDate: fy.endDate.split('T')[0] });
     setShowModal(true);
   };
 
@@ -40,12 +40,12 @@ export default function FiscalYearsPage() {
     if (!form.name || !form.startDate || !form.endDate) return;
     if (editingId) {
       store.updateFiscalYear(editingId, {
-        name: form.name, nameAr: form.nameAr,
+        name: form.name, nameAr: form.name,
         startDate: form.startDate, endDate: form.endDate,
       });
     } else {
       store.addFiscalYear({
-        name: form.name, nameAr: form.nameAr,
+        name: form.name, nameAr: form.name,
         startDate: form.startDate, endDate: form.endDate,
         isClosed: false, closedAt: null,
       });
@@ -132,7 +132,6 @@ export default function FiscalYearsPage() {
       <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={editingId ? t('fiscalYears.edit') : t('fiscalYears.create')}>
         <div className="space-y-4">
           <Input label={t('fiscalYears.name')} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
-          <Input label={t('fiscalYears.nameAr')} value={form.nameAr} onChange={e => setForm(f => ({ ...f, nameAr: e.target.value }))} />
           <Input type="date" label={t('fiscalYears.startDate')} value={form.startDate} onChange={e => setForm(f => ({ ...f, startDate: e.target.value }))} />
           <Input type="date" label={t('fiscalYears.endDate')} value={form.endDate} onChange={e => setForm(f => ({ ...f, endDate: e.target.value }))} />
           <div className="flex justify-end gap-2">

@@ -22,7 +22,6 @@ export default function CustomerAccountPage() {
   const [entryDate, setEntryDate] = useState(new Date().toISOString().split('T')[0]);
   const [entryRef, setEntryRef] = useState('');
   const [entryDesc, setEntryDesc] = useState('');
-  const [entryDescAr, setEntryDescAr] = useState('');
   const [entryDebit, setEntryDebit] = useState('');
   const [entryCredit, setEntryCredit] = useState('');
   const [entryPaymentMethod, setEntryPaymentMethod] = useState('cash');
@@ -190,25 +189,29 @@ export default function CustomerAccountPage() {
                     { value: '', label: `-- ${t('treasury.account')} --` },
                     ...store.treasuryAccounts.map(a => ({ value: a.id, label: language === 'ar' ? a.nameAr : a.name })),
                   ]} />
-                <Input label={t('customerAccount.description')} value={entryDesc} onChange={(e) => setEntryDesc(e.target.value)} placeholder="English description" />
-                <Input label={t('customerAccount.descriptionAr')} value={entryDescAr} onChange={(e) => setEntryDescAr(e.target.value)} placeholder="الوصف بالعربية" />
+                <Input label={t('customerAccount.description')} value={entryDesc} onChange={(e) => setEntryDesc(e.target.value)} />
                 <Input label={t('customerAccount.debit')} type="number" value={entryDebit} onChange={(e) => setEntryDebit(e.target.value)} placeholder="0" />
                 <Input label={t('customerAccount.credit')} type="number" value={entryCredit} onChange={(e) => setEntryCredit(e.target.value)} placeholder="0" />
               </div>
               <div className="flex justify-end gap-2 mt-4">
-                <Button variant="outline" onClick={() => { setShowEntryForm(false); setEntryDate(new Date().toISOString().split('T')[0]); setEntryRef(''); setEntryDesc(''); setEntryDescAr(''); setEntryDebit(''); setEntryCredit(''); setEntryAccountId(''); }}>{t('app.cancel')}</Button>
+                <Button variant="outline" onClick={() => { setShowEntryForm(false); setEntryDate(new Date().toISOString().split('T')[0]); setEntryRef(''); setEntryDesc(''); setEntryDebit(''); setEntryCredit(''); setEntryAccountId(''); }}>{t('app.cancel')}</Button>
                 <Button onClick={() => {
                   if (!entryDebit && !entryCredit) return;
                   const debit = parseFloat(entryDebit) || 0;
                   const credit = parseFloat(entryCredit) || 0;
                   const referenceNumber = entryRef || `MAN-${Date.now()}`;
+                  const customerName = customer ? (customer.name || customer.nameAr || '') : '';
+                  const statementDesc = entryDesc.trim() || `Manual payment - ${referenceNumber}`;
+                  const treasuryDesc = customerName
+                    ? (entryDesc.trim() ? `${customerName} - ${entryDesc.trim()}` : customerName)
+                    : statementDesc;
                   store.addCustomerStatement({
                     customerId: selectedCustomerId,
                     date: entryDate,
                     type: 'manual',
                     referenceNumber,
-                    description: entryDesc,
-                    descriptionAr: entryDescAr,
+                    description: statementDesc,
+                    descriptionAr: statementDesc,
                     debit,
                     credit,
                     balance: 0,
@@ -233,8 +236,8 @@ export default function CustomerAccountPage() {
                       fromAccountId: null, toAccountId: null,
                       paymentMethod: entryPaymentMethod,
                       paymentMethodDetail: method ? (method.nameAr || method.name) : entryPaymentMethod,
-                      categoryId: '', description: entryDesc || `Manual payment - ${referenceNumber}`,
-                      descriptionAr: entryDescAr || `دفعة يدوية - ${referenceNumber}`,
+                      categoryId: '', description: treasuryDesc,
+                      descriptionAr: treasuryDesc,
                       referenceNumber,
                       receiptUrl: '', linkedInvoiceId: null, linkedPOId: null, linkedReturnId: null,
                       isRecurring: false, recurringPattern: null, nextOccurrence: null,
@@ -246,7 +249,6 @@ export default function CustomerAccountPage() {
                   setShowEntryForm(false);
                   setEntryRef('');
                   setEntryDesc('');
-                  setEntryDescAr('');
                   setEntryDebit('');
                   setEntryCredit('');
                   setEntryAccountId('');

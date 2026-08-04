@@ -90,12 +90,10 @@ export default function SettingsPage() {
 
         <TabsContent value="company" className="mt-4 space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input label="Company Name" value={getSetting('companyName')} onChange={(e) => updateSetting('companyName', e.target.value)} />
-            <Input label="Company Name (AR)" value={getSetting('companyNameAr')} onChange={(e) => updateSetting('companyNameAr', e.target.value)} />
+            <Input label="Company Name" value={getSetting('companyName')} onChange={(e) => { updateSetting('companyName', e.target.value); updateSetting('companyNameAr', e.target.value); }} />
             <Input label="Phone" value={getSetting('companyPhone')} onChange={(e) => updateSetting('companyPhone', e.target.value)} />
             <Input label="Email" value={getSetting('companyEmail')} onChange={(e) => updateSetting('companyEmail', e.target.value)} />
-            <Input label="Address (EN)" value={getSetting('companyAddress')} onChange={(e) => updateSetting('companyAddress', e.target.value)} />
-            <Input label="Address (AR)" value={getSetting('companyAddressAr')} onChange={(e) => updateSetting('companyAddressAr', e.target.value)} />
+            <Input label="Address" value={getSetting('companyAddress')} onChange={(e) => { updateSetting('companyAddress', e.target.value); updateSetting('companyAddressAr', e.target.value); }} />
             <Input label="Tax Number" value={getSetting('companyTaxNumber')} onChange={(e) => updateSetting('companyTaxNumber', e.target.value)} />
             <Select label="Currency" value={getSetting('defaultCurrency')} onChange={(e) => updateSetting('defaultCurrency', e.target.value)}
               options={[{ value: 'EGP', label: 'EGP (ج.م)' }, { value: 'SAR', label: 'SAR (ر.س)' }, { value: 'USD', label: 'USD ($)' }]} />
@@ -107,12 +105,8 @@ export default function SettingsPage() {
             <Input label="Invoice Prefix" value={getSetting('invoicePrefix')} onChange={(e) => updateSetting('invoicePrefix', e.target.value)} />
           </div>
           <div>
-            <label className="label">Invoice Terms (EN)</label>
-            <textarea className="input mt-1 min-h-[80px]" value={getSetting('invoiceTerms')} onChange={(e) => updateSetting('invoiceTerms', e.target.value)} />
-          </div>
-          <div>
-            <label className="label">Invoice Terms (AR)</label>
-            <textarea className="input mt-1 min-h-[80px]" value={getSetting('invoiceTermsAr')} onChange={(e) => updateSetting('invoiceTermsAr', e.target.value)} />
+            <label className="label">Invoice Terms</label>
+            <textarea className="input mt-1 min-h-[80px]" value={getSetting('invoiceTerms')} onChange={(e) => { updateSetting('invoiceTerms', e.target.value); updateSetting('invoiceTermsAr', e.target.value); }} />
           </div>
         </TabsContent>
 

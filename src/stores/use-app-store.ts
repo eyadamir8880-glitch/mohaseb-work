@@ -136,8 +136,33 @@ function stripChildArrays(obj: any): any {
 
 export const syncPausedModules = new Set<string>();
 
+// Local records that have been written to the store but whose Supabase sync has
+// not yet been confirmed. mergeWithLocal keeps these so they never disappear
+// while a sync is in flight (or retrying).
+export const pendingSyncIds = new Map<string, Set<string>>();
+
+function markPending(endpoint: string, id?: string) {
+  if (!id) return;
+  let ids = pendingSyncIds.get(endpoint);
+  if (!ids) {
+    ids = new Set();
+    pendingSyncIds.set(endpoint, ids);
+  }
+  ids.add(id);
+}
+
+function clearPending(endpoint: string, id?: string) {
+  if (!id) return;
+  const ids = pendingSyncIds.get(endpoint);
+  if (ids) {
+    ids.delete(id);
+    if (ids.size === 0) pendingSyncIds.delete(endpoint);
+  }
+}
+
 async function syncToSupabase(method: 'post' | 'put' | 'delete', endpoint: string, data?: any, retries = 3) {
   if (!isSupabaseConfigured) return;
+  if (method === 'post' && data?.id) markPending(endpoint, data.id);
   for (let attempt = 0; attempt < retries; attempt++) {
     try {
       const cleanData = stripChildArrays(data);
@@ -148,6 +173,7 @@ async function syncToSupabase(method: 'post' | 'put' | 'delete', endpoint: strin
       } else {
         await apiClient.post(endpoint, cleanData);
       }
+      if (data?.id) clearPending(endpoint, data.id);
       return;
     } catch (err) {
       if (attempt < retries - 1) {

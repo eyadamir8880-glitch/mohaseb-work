@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
-import { useAppStore, syncPausedModules } from '@/stores/use-app-store';
+import { useAppStore, syncPausedModules, pendingSyncIds } from '@/stores/use-app-store';
 import { isSupabaseConfigured, getSupabase } from '@/lib/supabase';
 import { apiClient } from '@/lib/api-client';
 import type { RealtimeChannel } from '@supabase/supabase-js';
@@ -111,12 +111,21 @@ export function useSupabaseRealtime() {
       const supabaseIds = new Set(supabaseData.map((r: any) => r.id));
       const onlyLocal = localData.filter((r: any) => !supabaseIds.has(r.id));
       const lastSync = pollTimestamps.current[module] || 0;
-      // Keep local records that were created after last sync (pending sync),
-      // discard records that existed before last sync but are no longer in Supabase (deleted remotely)
+      const pendingIds = pendingSyncIds.get(module);
+      // Keep local records that are still awaiting their Supabase sync, plus
+      // records created after last sync (pending sync). Discard only records
+      // that existed before last sync and are no longer in Supabase (deleted remotely).
       const pendingLocal = onlyLocal.filter((r: any) => {
         const createdAt = new Date(r.createdAt || 0).getTime();
-        return createdAt > lastSync;
+        return createdAt > lastSync || (pendingIds?.has(r.id) ?? false);
       });
+      // Clear pending markers for records now confirmed in Supabase
+      if (pendingIds && pendingIds.size > 0) {
+        for (const r of supabaseData) {
+          if (pendingIds.has(r.id)) pendingIds.delete(r.id);
+        }
+        if (pendingIds.size === 0) pendingSyncIds.delete(module);
+      }
       useAppStore.setState({ [module]: [...pendingLocal, ...supabaseData] });
       pollTimestamps.current[module] = Date.now();
     };
