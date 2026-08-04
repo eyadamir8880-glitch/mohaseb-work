@@ -49,16 +49,7 @@ export default function ProductsPage() {
   useEffect(() => {
     if (backfillRef.current || products.length === 0) return;
     backfillRef.current = true;
-    const missing = products.filter(p => p.serialNumber === undefined || p.serialNumber === null);
-    if (missing.length === 0) return;
-    let next = products.reduce((m, p) => Math.max(m, p.serialNumber || 0), 0);
-    const sorted = [...products].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-    for (const p of sorted) {
-      if (p.serialNumber === undefined || p.serialNumber === null) {
-        next += 1;
-        store.updateProduct(p.id, { serialNumber: next });
-      }
-    }
+    store.backfillProductSerials();
   }, [products, store]);
 
   const resetForm = () => setForm({
