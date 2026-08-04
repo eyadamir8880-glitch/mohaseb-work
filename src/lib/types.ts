@@ -17,6 +17,7 @@ export interface Customer {
 
 export interface Product {
   id: string;
+  serialNumber?: number;
   name: string;
   nameAr: string;
   sku: string;

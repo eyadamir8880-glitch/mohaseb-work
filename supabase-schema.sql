@@ -256,6 +256,7 @@ CREATE INDEX idx_depreciation_records_asset ON depreciation_records(asset_id);
 -- Products
 CREATE TABLE products (
   id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  serial_number       integer,
   name                text NOT NULL,
   name_ar             text NOT NULL DEFAULT '',
   sku                 text NOT NULL DEFAULT '',
@@ -640,3 +641,18 @@ ALTER TABLE treasury_transactions ADD CONSTRAINT fk_tt_invoice FOREIGN KEY (link
 ALTER TABLE treasury_transactions ADD CONSTRAINT fk_tt_po FOREIGN KEY (linked_po_id) REFERENCES purchase_orders(id);
 ALTER TABLE treasury_transactions ADD CONSTRAINT fk_tt_return FOREIGN KEY (linked_return_id) REFERENCES returns(id);
 ALTER TABLE payroll_records ADD CONSTRAINT fk_pr_treasury FOREIGN KEY (treasury_transaction_id) REFERENCES treasury_transactions(id);
+
+-- Migration: product serial numbers (for existing databases)
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'products' AND column_name = 'serial_number') THEN
+    ALTER TABLE products ADD COLUMN serial_number integer;
+  END IF;
+END $$;
+UPDATE products SET serial_number = sub.rn
+FROM (
+  SELECT id, row_number() OVER (ORDER BY created_at ASC, id ASC) AS rn
+  FROM products
+  WHERE serial_number IS NULL
+) sub
+WHERE products.id = sub.id;

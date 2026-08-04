@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useLanguage } from '@/providers/language-provider';
 import { useAppStore } from '@/stores/use-app-store';
 import { Card, CardContent } from '@/components/ui/card';
@@ -39,11 +39,27 @@ export default function ProductsPage() {
   const filtered = useMemo(() => {
     return products.filter((p) => {
       const q = search.toLowerCase();
-      const matchSearch = !q || p.name.toLowerCase().includes(q) || (p.nameAr && p.nameAr.toLowerCase().includes(q)) || p.sku.toLowerCase().includes(q);
+      const matchSearch = !q || p.name.toLowerCase().includes(q) || (p.nameAr && p.nameAr.toLowerCase().includes(q)) || p.sku.toLowerCase().includes(q) || (p.serialNumber !== undefined && String(p.serialNumber).includes(q));
       const matchCat = catFilter === 'all' || p.categoryId === catFilter;
       return matchSearch && matchCat;
     });
   }, [products, search, catFilter]);
+
+  const backfillRef = useRef(false);
+  useEffect(() => {
+    if (backfillRef.current || products.length === 0) return;
+    backfillRef.current = true;
+    const missing = products.filter(p => p.serialNumber === undefined || p.serialNumber === null);
+    if (missing.length === 0) return;
+    let next = products.reduce((m, p) => Math.max(m, p.serialNumber || 0), 0);
+    const sorted = [...products].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+    for (const p of sorted) {
+      if (p.serialNumber === undefined || p.serialNumber === null) {
+        next += 1;
+        store.updateProduct(p.id, { serialNumber: next });
+      }
+    }
+  }, [products, store]);
 
   const resetForm = () => setForm({
     name: '', sku: '', barcode: '', description: '',
@@ -263,6 +279,7 @@ export default function ProductsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b bg-muted/50">
+                  <th className="text-left p-3">#</th>
                   <th className="text-left p-3">{t('products.name')}</th>
                   <th className="text-left p-3">SKU</th>
                   <th className="text-left p-3">{t('app.category')}</th>
@@ -276,6 +293,7 @@ export default function ProductsPage() {
               <tbody>
                 {filtered.map((p) => (
                   <tr key={p.id} className="border-b hover:bg-muted/50">
+                    <td className="p-3 font-mono text-xs text-muted-foreground">{p.serialNumber || '—'}</td>
                     <td className="p-3 font-medium">{language === 'ar' ? p.nameAr || p.name : p.name}</td>
                     <td className="p-3 text-muted-foreground font-mono text-xs">{p.sku}</td>
                     <td className="p-3 text-muted-foreground">{getCategoryName(p.categoryId)}</td>

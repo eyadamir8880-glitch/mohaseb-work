@@ -580,14 +580,16 @@ export const useAppStore = create<AppStore>()(
   },
 
   addProduct: (data) => {
-    const product: Product = { ...data, id: generateId(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    const maxSerial = get().products.reduce((m, p) => Math.max(m, p.serialNumber || 0), 0);
+    const product: Product = { ...data, serialNumber: maxSerial + 1, id: generateId(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
     set((state) => ({ products: [product, ...state.products] }));
     get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'created', module: 'products', recordId: product.id, oldValues: null, newValues: data, ip: '' });
     syncToSupabase('post', 'products', product);
     return product;
   },
   bulkAddProducts: async (dataArr) => {
-    const products = dataArr.map(data => ({ ...data, id: generateId(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } as Product));
+    let maxSerial = get().products.reduce((m, p) => Math.max(m, p.serialNumber || 0), 0);
+    const products = dataArr.map(data => ({ ...data, serialNumber: ++maxSerial, id: generateId(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } as Product));
     set((state) => ({ products: [...products, ...state.products] }));
     get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'created', module: 'products', recordId: `${products.length} bulk`, oldValues: null, newValues: { count: products.length }, ip: '' });
     if (isSupabaseConfigured) {
