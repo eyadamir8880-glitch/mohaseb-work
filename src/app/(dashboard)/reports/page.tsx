@@ -146,7 +146,7 @@ export default function ReportsPage() {
     } else if (activeTab === 'inventoryValuation') {
       data = store.products.map(p => ({
         [t('products.name')]: language === 'ar' ? p.nameAr : p.name,
-        [t('reports.totalStockValue')]: p.purchasePrice * p.stock,
+        [t('reports.totalStockValue')]: (Number(p.purchasePrice) || 0) * (Number(p.stock) || 0),
         [t('reports.costOfSales')]: inventoryValuation.productMovements[p.id]?.outvalue || 0,
       }));
     }
@@ -164,7 +164,7 @@ export default function ReportsPage() {
       if (!productMovements[m.productId]) productMovements[m.productId] = { inqty: 0, invalue: 0, outqty: 0, outvalue: 0 };
       const product = productMap.get(m.productId);
       if (!product) return;
-      const unitCost = product.purchasePrice;
+      const unitCost = Number(product.purchasePrice) || 0;
       if (m.type === 'in') {
         productMovements[m.productId].inqty += m.quantity;
         productMovements[m.productId].invalue += m.quantity * unitCost;
@@ -174,7 +174,7 @@ export default function ReportsPage() {
       }
     });
     const totalCOGS = Object.values(productMovements).reduce((s, v) => s + v.outvalue, 0);
-    const totalStockValue = store.products.reduce((s, p) => s + p.purchasePrice * p.stock, 0);
+    const totalStockValue = store.products.reduce((s, p) => s + ((Number(p.purchasePrice) || 0) * (Number(p.stock) || 0)), 0);
     return { productMovements, totalCOGS, totalStockValue };
   }, [store.products, store.stockMovements, dateFrom, dateTo]);
 
@@ -389,7 +389,7 @@ export default function ReportsPage() {
                   return (
                     <tr key={p.id}>
                       <td>{language === 'ar' ? p.nameAr : p.name}</td>
-                      <td className="text-right">{formatCurrency(p.purchasePrice * p.stock, 'EGP', language)}</td>
+                      <td className="text-right">{formatCurrency((Number(p.purchasePrice) || 0) * (Number(p.stock) || 0), 'EGP', language)}</td>
                       <td className="text-right">{mov ? (mov.inqty - mov.outqty) : 0}</td>
                       <td className="text-right text-red-600">{mov ? formatCurrency(mov.outvalue, 'EGP', language) : '-'}</td>
                     </tr>
