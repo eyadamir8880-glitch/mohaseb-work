@@ -19,7 +19,7 @@ export default function WarehousePage() {
 
   const stats = useMemo(() => {
     const totalProducts = products.length;
-    const totalValue = products.reduce((s, p) => s + ((Number(p.purchasePrice) || 0) * (Number(p.stock) || 0)), 0);
+    const totalValue = products.reduce((s, p) => s + ((Number(p.sellingPrice) || 0) * (Number(p.stock) || 0)), 0);
     const lowStock = products.filter(p => p.trackInventory && p.stock > 0 && p.stock <= p.lowStockThreshold).length;
     const outOfStock = products.filter(p => p.trackInventory && p.stock === 0).length;
     return { totalProducts, totalValue, lowStock, outOfStock };
