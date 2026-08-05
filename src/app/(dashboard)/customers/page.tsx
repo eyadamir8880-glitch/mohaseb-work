@@ -3,13 +3,15 @@
 import { useState, useMemo } from 'react';
 import { useLanguage } from '@/providers/language-provider';
 import { useAppStore } from '@/stores/use-app-store';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, readFileAsArrayBuffer } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import { Input } from '@/components/ui/input';
 import { DataTable } from '@/components/ui/data-table';
 import { ConfirmModal } from '@/components/ui/confirm-modal';
-import { Trash2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Trash2, Upload } from 'lucide-react';
+import { PAYMENT_METHODS } from '@/lib/constants';
 
 export default function CustomersPage() {
   const { language, t } = useLanguage();
@@ -20,6 +22,14 @@ export default function CustomersPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showDeleteAll, setShowDeleteAll] = useState(false);
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null);
+  const [showImport, setShowImport] = useState(false);
+  const [importStep, setImportStep] = useState<'upload' | 'preview' | 'result'>('upload');
+  const [importing, setImporting] = useState(false);
+  const [parsedRows, setParsedRows] = useState<{
+    name: string; totalDebt: number; collected: number; remaining: number;
+    valid: boolean; reason: string; selected: boolean; rowIndex: number; isExisting: boolean;
+  }[]>([]);
+  const [importResult, setImportResult] = useState<{ imported: number; updated: number; skipped: number; errors: string[] } | null>(null);
 
   const filtered = useMemo(() => {
     let result = [...customers];
@@ -70,11 +80,180 @@ export default function CustomersPage() {
     setShowDeleteAll(false);
   };
 
+  const getCol = (row: any, ...keys: string[]) => {
+    const rowKeys = Object.keys(row);
+    for (const k of keys) {
+      const match = rowKeys.find(rk => rk.toLowerCase() === k.toLowerCase());
+      if (match && row[match] !== undefined && row[match] !== '') return String(row[match]).trim();
+    }
+    return '';
+  };
+
+  const toNumber = (raw: string) => {
+    const ar = '٠١٢٣٤٥٦٧٨٩';
+    const fa = '۰۱۲۳۴۵۶۷۸۹';
+    let s = String(raw || '');
+    for (let i = 0; i < 10; i++) {
+      s = s.split(ar[i]).join(String(i)).split(fa[i]).join(String(i));
+    }
+    s = s.replace(/[^0-9.]/g, '');
+    return parseFloat(s) || 0;
+  };
+
+  const parseFile = async (file: File) => {
+    setImporting(true);
+    setImportStep('upload');
+    try {
+      const XLSX = await import('xlsx');
+      const buffer = await readFileAsArrayBuffer(file);
+      const workbook = XLSX.read(buffer, { type: 'array' });
+      const sheet = workbook.Sheets[workbook.SheetNames[0]];
+      const rows: any[] = XLSX.utils.sheet_to_json(sheet);
+      const parsed = rows.map((row, i) => {
+        const name = getCol(row, 'العميل', 'customer', 'customer name', 'customer_name', 'customerName', 'client', 'name');
+        const totalDebt = toNumber(getCol(row, 'اجمالي الفواتير', 'total invoices', 'total_invoices', 'totalInvoices', 'debt', 'totalDebt', 'total invoiced'));
+        const collected = toNumber(getCol(row, 'المحصل', 'collected', 'total paid', 'total_paid', 'totalPaid', 'paid'));
+        const remaining = toNumber(getCol(row, 'المتبقي', 'remaining', 'remaining balance', 'remaining_balance', 'remainingBalance', 'balance', 'due'));
+        let valid = true;
+        let reason = '';
+        if (!name) { valid = false; reason = t('customerImport.missingName'); }
+        const normalized = name.trim().toLowerCase();
+        const isExisting = valid && customers.some(c => (c.name || '').toLowerCase().trim() === normalized || (c.nameAr || '').toLowerCase().trim() === normalized);
+        return { name, totalDebt, collected, remaining, valid, reason, selected: valid, rowIndex: i, isExisting };
+      });
+      const seenNames = new Set<string>();
+      parsed.forEach((row, i) => {
+        const normalized = row.name.trim().toLowerCase();
+        if (row.valid && normalized && seenNames.has(normalized)) {
+          row.valid = false;
+          row.reason = t('customerImport.duplicateName');
+          row.selected = false;
+        }
+        if (normalized) seenNames.add(normalized);
+      });
+      setParsedRows(parsed);
+      setImportStep('preview');
+    } catch (e: any) {
+      setImportResult({ imported: 0, updated: 0, skipped: 0, errors: [e.message] });
+      setImportStep('result');
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const toggleRow = (index: number) => {
+    setParsedRows(prev => prev.map((r, i) => i === index ? { ...r, selected: !r.selected } : r));
+  };
+
+  const toggleSelectAll = () => {
+    const allSelected = parsedRows.every(r => r.selected || !r.valid);
+    setParsedRows(prev => prev.map(r => r.valid ? { ...r, selected: !allSelected } : r));
+  };
+
+  const executeImport = () => {
+    const selected = parsedRows.filter(r => r.selected);
+    if (selected.length === 0) return;
+    const today = new Date().toISOString().split('T')[0];
+    const refBase = `IMP-${today.replace(/-/g, '')}`;
+    let imported = 0;
+    let updated = 0;
+    const errors: string[] = [];
+    selected.forEach((row, i) => {
+      try {
+        const name = row.name.trim();
+        const existing = customers.find(c => (c.name || '').toLowerCase().trim() === name.toLowerCase() || (c.nameAr || '').toLowerCase().trim() === name.toLowerCase());
+        const openingDebit = row.remaining + row.collected;
+        const paymentCredit = row.collected;
+        const referenceNumber = `${refBase}-${String(i + 1).padStart(3, '0')}`;
+        let customerId: string;
+        if (existing) {
+          store.updateCustomer(existing.id, {
+            name, nameAr: name,
+            totalInvoiced: (existing.totalInvoiced || 0) + row.totalDebt,
+            totalPaid: (existing.totalPaid || 0) + row.collected,
+            totalDue: (existing.totalDue || 0) + row.remaining,
+          });
+          customerId = existing.id;
+          updated++;
+        } else {
+          const cust = store.addCustomer({
+            name, nameAr: name, phone: '', email: '', address: '', taxNumber: '',
+            creditLimit: 0,
+            totalInvoiced: row.totalDebt, totalPaid: row.collected, totalDue: row.remaining,
+            customPricingRules: [],
+          });
+          customerId = cust.id;
+          imported++;
+        }
+        if (openingDebit > 0 || paymentCredit > 0) {
+          store.addCustomerStatement({
+            customerId,
+            date: today,
+            type: 'opening_balance',
+            referenceNumber,
+            description: `${t('customerImport.openingBalance')} - ${name}`,
+            descriptionAr: `${t('customerImport.openingBalance')} - ${name}`,
+            debit: openingDebit,
+            credit: 0,
+            balance: 0,
+          });
+        }
+        if (paymentCredit > 0) {
+          store.addCustomerStatement({
+            customerId,
+            date: today,
+            type: 'payment',
+            referenceNumber,
+            description: `${t('customerImport.paymentReceived')} - ${name}`,
+            descriptionAr: `${t('customerImport.paymentReceived')} - ${name}`,
+            debit: 0,
+            credit: paymentCredit,
+            balance: 0,
+          });
+          let accountId = '';
+          const defaultAcc = store.treasuryAccounts[0];
+          if (defaultAcc) accountId = defaultAcc.id;
+          else {
+            const acc = store.addTreasuryAccount({
+              name: 'Main Cash', nameAr: 'الخزينة الرئيسية', type: 'cash',
+              balance: 0, currency: 'EGP', isDefault: true,
+            });
+            accountId = acc.id;
+          }
+          const method = [...store.paymentMethods, ...PAYMENT_METHODS].find(p => p.id === 'cash');
+          const treasuryDesc = `${name} - ${t('customerImport.treasuryNote')}`;
+          store.addTreasuryTransaction({
+            type: 'income', amount: paymentCredit, date: today,
+            accountId,
+            fromAccountId: null, toAccountId: null,
+            paymentMethod: 'cash',
+            paymentMethodDetail: method ? (method.nameAr || method.name) : 'cash',
+            categoryId: '', description: treasuryDesc, descriptionAr: treasuryDesc,
+            referenceNumber,
+            receiptUrl: '', linkedInvoiceId: null, linkedPOId: null, linkedReturnId: null,
+            isRecurring: false, recurringPattern: null, nextOccurrence: null,
+            isReconciled: false, reconciledAt: null,
+          });
+          const account = store.treasuryAccounts.find(a => a.id === accountId);
+          if (account) store.updateTreasuryAccount(accountId, { balance: (account.balance || 0) + paymentCredit });
+        }
+      } catch (e: any) {
+        errors.push(`${row.name}: ${e.message}`);
+      }
+    });
+    setImportResult({ imported, updated, skipped: parsedRows.length - selected.length, errors });
+    setImportStep('result');
+  };
+
   return (
     <div className="space-y-6">
       <div className="page-header">
         <h1 className="page-title">{t('customers.title')}</h1>
         <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setShowImport(true)} className="gap-2">
+            <Upload className="h-4 w-4" />
+            {t('customerImport.title')}
+          </Button>
           <Button variant="outline" onClick={() => setShowDeleteAll(true)} className="gap-2 text-red-600 border-red-300 hover:bg-red-50 dark:hover:bg-red-950">
             <Trash2 className="h-4 w-4" />
             {t('app.deleteAll')}
@@ -121,6 +300,136 @@ export default function CustomersPage() {
         confirmLabel={t('app.yesDelete')}
         cancelLabel={t('app.cancel')}
       />
+
+      {showImport && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="fixed inset-0 bg-black/50" onClick={() => { if (!importing) { setShowImport(false); setImportResult(null); setImportStep('upload'); setParsedRows([]); } }} />
+          <div className="relative bg-background rounded-lg shadow-xl w-full max-w-3xl mx-4 max-h-[90vh] overflow-y-auto p-6">
+            <h2 className="text-lg font-semibold mb-4">{t('customerImport.title')}</h2>
+
+            {importStep === 'upload' && (
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">{t('import.dragDrop')}</p>
+                <div className="border-2 border-dashed rounded-lg p-8 text-center cursor-pointer hover:bg-muted/50"
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f) parseFile(f); }}>
+                  <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                  <p className="text-sm text-muted-foreground">{t('import.dragDrop')}</p>
+                  <input
+                    type="file"
+                    accept=".xlsx,.xls,.csv"
+                    className="hidden"
+                    id="customer-excel-upload"
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) parseFile(f); }}
+                  />
+                  <Button variant="outline" className="mt-3" onClick={() => document.getElementById('customer-excel-upload')?.click()}>
+                    {t('import.selectFile')}
+                  </Button>
+                </div>
+                <div className="text-xs text-muted-foreground space-y-1">
+                  <p>{t('import.expectedColumns')}:</p>
+                  <ul className="list-disc list-inside">
+                    <li>{t('customerImport.customerName')} (<span dir="rtl">العميل</span>)</li>
+                    <li>{t('customerImport.totalDebt')} (<span dir="rtl">اجمالي الفواتير</span>)</li>
+                    <li>{t('customerImport.collected')} (<span dir="rtl">المحصل</span>)</li>
+                    <li>{t('customerImport.remaining')} (<span dir="rtl">المتبقي</span>)</li>
+                  </ul>
+                </div>
+                {importing && <p className="text-sm text-center text-primary">{t('import.processing')}</p>}
+                <div className="flex justify-end">
+                  <Button variant="outline" onClick={() => { setShowImport(false); setImportResult(null); setImportStep('upload'); setParsedRows([]); }}>{t('app.cancel')}</Button>
+                </div>
+              </div>
+            )}
+
+            {importStep === 'preview' && !importing && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    {parsedRows.filter(r => r.valid).length} {t('import.valid')} / {parsedRows.length} {t('import.totalRows').toLowerCase()}
+                  </p>
+                  <label className="flex items-center gap-2 text-sm cursor-pointer">
+                    <input type="checkbox" checked={parsedRows.filter(r => r.valid).every(r => r.selected)} onChange={toggleSelectAll} className="h-4 w-4" />
+                    {t('import.selectAll')}
+                  </label>
+                </div>
+                <div className="max-h-64 overflow-auto border rounded-lg">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b bg-muted/50">
+                        <th className="w-10 p-2 text-center">
+                          <input type="checkbox" checked={parsedRows.filter(r => r.valid).every(r => r.selected)} onChange={toggleSelectAll} className="h-4 w-4" />
+                        </th>
+                        <th className="text-center p-2">#</th>
+                        <th className="text-left p-2">{t('customerImport.customerName')}</th>
+                        <th className="text-right p-2">{t('customerImport.totalDebt')}</th>
+                        <th className="text-right p-2">{t('customerImport.collected')}</th>
+                        <th className="text-right p-2">{t('customerImport.remaining')}</th>
+                        <th className="text-center p-2">{t('app.status')}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {parsedRows.map((row, i) => (
+                        <tr key={i} className={`border-b hover:bg-muted/50 ${!row.valid ? 'opacity-60' : ''}`}>
+                          <td className="p-2 text-center">
+                            <input type="checkbox" checked={row.selected} disabled={!row.valid}
+                              onChange={() => toggleRow(i)} className="h-4 w-4" />
+                          </td>
+                          <td className="p-2 text-center font-mono text-xs">{i + 1}</td>
+                          <td className="p-2">{row.name || '-'}</td>
+                          <td className="p-2 text-right">{row.totalDebt > 0 ? formatCurrency(row.totalDebt, 'EGP', language) : '-'}</td>
+                          <td className="p-2 text-right">{row.collected > 0 ? formatCurrency(row.collected, 'EGP', language) : '-'}</td>
+                          <td className="p-2 text-right">{row.remaining > 0 ? formatCurrency(row.remaining, 'EGP', language) : '-'}</td>
+                          <td className="p-2 text-center">
+                            {row.valid ? (
+                              row.isExisting ? (
+                                <Badge variant="yellow">{t('customerImport.exists')}</Badge>
+                              ) : (
+                                <Badge variant="green">{t('import.valid')}</Badge>
+                              )
+                            ) : (
+                              <span className="text-xs text-red-500">{row.reason}</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => { setImportStep('upload'); setParsedRows([]); }}>{t('import.importAnother')}</Button>
+                  <Button onClick={executeImport} disabled={!parsedRows.some(r => r.selected)}>
+                    {t('import.importSelected')} ({parsedRows.filter(r => r.selected).length})
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {importStep === 'result' && importResult && (
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">{t('import.importComplete')}</p>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <span>{t('import.imported')}: <strong>{importResult.imported}</strong></span>
+                  <span>{t('customerImport.updated')}: <strong>{importResult.updated}</strong></span>
+                  <span>{t('import.skipped')}: <strong>{importResult.skipped}</strong></span>
+                </div>
+                {importResult.errors.length > 0 && (
+                  <div>
+                    <p className="text-sm text-red-500 mb-1">{t('import.errors')}:</p>
+                    {importResult.errors.slice(0, 5).map((e, i) => (
+                      <p key={i} className="text-xs text-red-400">- {e}</p>
+                    ))}
+                  </div>
+                )}
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => { setImportStep('upload'); setImportResult(null); setParsedRows([]); }}>{t('import.importAnother')}</Button>
+                  <Button onClick={() => { setShowImport(false); setImportResult(null); setImportStep('upload'); setParsedRows([]); }}>{t('app.close')}</Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -28,7 +28,7 @@ export function formatDate(dateStr: string, language: 'en' | 'ar' = 'en'): strin
 
 export function formatDateFull(dateStr: string, language: 'en' | 'ar' = 'en'): string {
   const date = new Date(dateStr);
-  return date.toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-GB', {
+  return date.toLocaleDateString(language === 'ar' ? 'ar-EG-u-nu-latn' : 'en-GB', {
     year: 'numeric',
     month: 'long',
     day: 'numeric',

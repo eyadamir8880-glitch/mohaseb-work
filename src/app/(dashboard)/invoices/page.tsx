@@ -226,8 +226,8 @@ export default function InvoicesPage() {
           <div class="invoice-info">
             <h2>INVOICE</h2>
             <p><strong>${inv.invoiceNumber}</strong></p>
-            <p>Date: ${new Date(inv.issueDate).toLocaleDateString()}</p>
-            <p>Due: ${new Date(inv.dueDate).toLocaleDateString()}</p>
+            <p>Date: ${formatDate(inv.issueDate, locale)}</p>
+            <p>Due: ${formatDate(inv.dueDate, locale)}</p>
             <p style="margin-top:6px"><span class="status ${inv.status}">${inv.status.replace('_', ' ').toUpperCase()}</span></p>
           </div>
         </div>
@@ -242,9 +242,9 @@ export default function InvoicesPage() {
           </div>
           <div style="text-align:right">
             <div class="label">Payment Info</div>
-            <div class="value">Paid: ${new Intl.NumberFormat(locale === 'ar' ? 'ar-EG' : 'en-EG', { style: 'currency', currency }).format(inv.paidAmount)}</div>
+            <div class="value">Paid: ${new Intl.NumberFormat(locale === 'ar' ? 'ar-EG-u-nu-latn' : 'en-EG', { style: 'currency', currency }).format(inv.paidAmount)}</div>
             <div class="value" style="color:${(inv.grandTotal - inv.paidAmount) > 0 ? '#dc2626' : '#16a34a'}">
-              Balance: ${new Intl.NumberFormat(locale === 'ar' ? 'ar-EG' : 'en-EG', { style: 'currency', currency }).format(inv.grandTotal - inv.paidAmount)}
+              Balance: ${new Intl.NumberFormat(locale === 'ar' ? 'ar-EG-u-nu-latn' : 'en-EG', { style: 'currency', currency }).format(inv.grandTotal - inv.paidAmount)}
             </div>
           </div>
         </div>
@@ -268,18 +268,18 @@ export default function InvoicesPage() {
                 <td>${locale === 'ar' ? item.productNameAr || item.productName : item.productName}</td>
                 <td>${item.sku || '-'}</td>
                 <td class="text-right">${item.quantity}</td>
-                <td class="text-right">${new Intl.NumberFormat(locale === 'ar' ? 'ar-EG' : 'en-EG', { style: 'currency', currency }).format(item.unitPrice)}</td>
+                <td class="text-right">${new Intl.NumberFormat(locale === 'ar' ? 'ar-EG-u-nu-latn' : 'en-EG', { style: 'currency', currency }).format(item.unitPrice)}</td>
                 <td class="text-right">${item.discountPercent > 0 ? item.discountPercent + '%' : '-'}</td>
-                <td class="text-right">${new Intl.NumberFormat(locale === 'ar' ? 'ar-EG' : 'en-EG', { style: 'currency', currency }).format(item.lineTotal)}</td>
+                <td class="text-right">${new Intl.NumberFormat(locale === 'ar' ? 'ar-EG-u-nu-latn' : 'en-EG', { style: 'currency', currency }).format(item.lineTotal)}</td>
               </tr>
             `).join('')}
           </tbody>
         </table>
 
         <div class="totals">
-          <div class="row"><span>Subtotal</span><span>${new Intl.NumberFormat(locale === 'ar' ? 'ar-EG' : 'en-EG', { style: 'currency', currency }).format(inv.subtotal)}</span></div>
-          ${inv.discountTotal > 0 ? `<div class="row"><span>Discount</span><span>-${new Intl.NumberFormat(locale === 'ar' ? 'ar-EG' : 'en-EG', { style: 'currency', currency }).format(inv.discountTotal)}</span></div>` : ''}
-          <div class="row total"><span>Grand Total</span><span>${new Intl.NumberFormat(locale === 'ar' ? 'ar-EG' : 'en-EG', { style: 'currency', currency }).format(inv.grandTotal)}</span></div>
+          <div class="row"><span>Subtotal</span><span>${new Intl.NumberFormat(locale === 'ar' ? 'ar-EG-u-nu-latn' : 'en-EG', { style: 'currency', currency }).format(inv.subtotal)}</span></div>
+          ${inv.discountTotal > 0 ? `<div class="row"><span>Discount</span><span>-${new Intl.NumberFormat(locale === 'ar' ? 'ar-EG-u-nu-latn' : 'en-EG', { style: 'currency', currency }).format(inv.discountTotal)}</span></div>` : ''}
+          <div class="row total"><span>Grand Total</span><span>${new Intl.NumberFormat(locale === 'ar' ? 'ar-EG-u-nu-latn' : 'en-EG', { style: 'currency', currency }).format(inv.grandTotal)}</span></div>
         </div>
 
         ${inv.notes ? `<div class="footer"><p style="text-align:left;margin-bottom:10px"><strong>Notes:</strong> ${inv.notes}</p></div>` : ''}

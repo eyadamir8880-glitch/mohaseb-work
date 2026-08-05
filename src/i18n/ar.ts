@@ -511,6 +511,21 @@ const ar = {
     importAnother: 'استيراد آخر',
   },
 
+  customerImport: {
+    title: 'استيراد العملاء',
+    customerName: 'اسم العميل',
+    totalDebt: 'إجمالي الفواتير',
+    collected: 'المحصل',
+    remaining: 'المتبقي',
+    missingName: 'اسم العميل ناقص',
+    duplicateName: 'اسم عميل مكرر',
+    exists: 'موجود - سيتم التحديث',
+    treasuryNote: 'استيراد رصيد افتتاحي',
+    openingBalance: 'رصيد افتتاحي',
+    paymentReceived: 'استلام دفعة',
+    updated: 'تم التحديث',
+  },
+
   404: {
     title: 'الصفحة غير موجودة',
     message: 'الصفحة التي تبحث عنها غير موجودة.',

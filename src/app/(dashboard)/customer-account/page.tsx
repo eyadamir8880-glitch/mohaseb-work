@@ -88,7 +88,6 @@ export default function CustomerAccountPage() {
 
     statements.forEach(s => {
       if (s.type === 'invoice') return; // invoices processed via activeInvoices
-      if (s.type === 'opening_balance') return; // opening balance removed
       if (s.type === 'return') return; // refunds already settled via treasury cash
       if (inactiveNumbers.has(s.referenceNumber)) return; // payments/refunds for draft/cancelled invoices
       if (s.type === 'payment' && !activeInvoiceNumbers.has(s.referenceNumber)) return; // account-level payments not tied to an invoice

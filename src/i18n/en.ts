@@ -511,6 +511,21 @@ const en = {
     importAnother: 'Import Another',
   },
 
+  customerImport: {
+    title: 'Import Customers',
+    customerName: 'Customer Name',
+    totalDebt: 'Total Debt',
+    collected: 'Collected',
+    remaining: 'Remaining',
+    missingName: 'Missing Customer Name',
+    duplicateName: 'Duplicate Customer Name',
+    exists: 'Exists - will update',
+    treasuryNote: 'Opening balance import',
+    openingBalance: 'Opening Balance',
+    paymentReceived: 'Payment Received',
+    updated: 'Updated',
+  },
+
   404: {
     title: 'Page Not Found',
     message: 'The page you are looking for does not exist.',
