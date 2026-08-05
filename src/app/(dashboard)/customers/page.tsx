@@ -44,9 +44,13 @@ export default function CustomersPage() {
     const map: Record<string, { totalInvoiced: number; totalPaid: number; totalDue: number }> = {};
     for (const c of customers) {
       const custInvoices = invoices.filter(i => i.customerId === c.id);
-      const totalInvoiced = custInvoices.reduce((s, i) => s + i.grandTotal, 0);
-      const totalPaid = custInvoices.reduce((s, i) => s + (i.paidAmount || 0), 0);
-      map[c.id] = { totalInvoiced, totalPaid, totalDue: totalInvoiced - totalPaid };
+      const invoiceInvoiced = custInvoices.reduce((s, i) => s + i.grandTotal, 0);
+      const invoicePaid = custInvoices.reduce((s, i) => s + (i.paidAmount || 0), 0);
+      map[c.id] = {
+        totalInvoiced: (c.totalInvoiced || 0) + invoiceInvoiced,
+        totalPaid: (c.totalPaid || 0) + invoicePaid,
+        totalDue: (c.totalDue || 0) + (invoiceInvoiced - invoicePaid),
+      };
     }
     return map;
   }, [customers, invoices]);

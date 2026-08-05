@@ -53,7 +53,6 @@ export default function CustomerAccountPage() {
     }[] = [];
 
     const activeInvoices = customerInvoices.filter(i => i.status !== 'draft' && i.status !== 'cancelled');
-    const activeInvoiceNumbers = new Set(activeInvoices.map(i => i.invoiceNumber));
     const inactiveNumbers = new Set(
       customerInvoices.filter(i => i.status === 'draft' || i.status === 'cancelled').map(i => i.invoiceNumber)
     );
@@ -90,7 +89,6 @@ export default function CustomerAccountPage() {
       if (s.type === 'invoice') return; // invoices processed via activeInvoices
       if (s.type === 'return') return; // refunds already settled via treasury cash
       if (inactiveNumbers.has(s.referenceNumber)) return; // payments/refunds for draft/cancelled invoices
-      if (s.type === 'payment' && !activeInvoiceNumbers.has(s.referenceNumber)) return; // account-level payments not tied to an invoice
       rows.push({
         date: s.date,
         reference: s.referenceNumber,
