@@ -37,11 +37,17 @@ export default function ProductsPage() {
   });
 
   const filtered = useMemo(() => {
-    return products.filter((p) => {
+    const list = products.filter((p) => {
       const q = search.trim().toLowerCase();
       const matchSearch = !q || p.name.toLowerCase().includes(q) || (p.nameAr && p.nameAr.toLowerCase().includes(q)) || p.sku.toLowerCase().includes(q) || (p.serialNumber !== undefined && String(p.serialNumber) === q);
       const matchCat = catFilter === 'all' || p.categoryId === catFilter;
       return matchSearch && matchCat;
+    });
+    return [...list].sort((a, b) => {
+      const sa = a.serialNumber ?? Infinity;
+      const sb = b.serialNumber ?? Infinity;
+      if (sa !== sb) return sa - sb;
+      return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
     });
   }, [products, search, catFilter]);
 
