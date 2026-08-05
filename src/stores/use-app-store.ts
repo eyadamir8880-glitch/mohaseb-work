@@ -60,6 +60,7 @@ interface AppStore {
 
   addProduct: (product: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>) => Product;
   bulkAddProducts: (dataArr: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>[]) => Product[] | Promise<Product[]>;
+  importCustomers: (rows: { name: string; totalDebt: number; collected: number; remaining: number }[], opts?: { openingBalanceLabel?: string; paymentReceivedLabel?: string; treasuryNote?: string; cashLabel?: string }) => Promise<{ imported: number; updated: number }>;
   updateProduct: (id: string, data: Partial<Product>) => void;
   deleteProduct: (id: string) => void;
 
@@ -614,6 +615,156 @@ export const useAppStore = create<AppStore>()(
       }
     }
     return products;
+  },
+  importCustomers: async (rows, opts = {}) => {
+    const now = new Date().toISOString();
+    const today = now.split('T')[0];
+    const state = get();
+    const openingBalanceLabel = opts.openingBalanceLabel || 'Opening balance';
+    const paymentReceivedLabel = opts.paymentReceivedLabel || 'Payment received';
+    const treasuryNote = opts.treasuryNote || 'Opening balance import';
+    const cashLabel = opts.cashLabel || 'Cash';
+
+    const existingByName = new Map<string, Customer>();
+    for (const c of state.customers) {
+      const key = (c.name || '').toLowerCase().trim();
+      if (key) existingByName.set(key, c);
+      const keyAr = (c.nameAr || '').toLowerCase().trim();
+      if (keyAr) existingByName.set(keyAr, c);
+    }
+
+    const refBase = `IMP-${today.replace(/-/g, '')}`;
+    const newCustomers: Customer[] = [];
+    const updatedCustomers: Customer[] = [];
+    const statements: CustomerStatement[] = [];
+    const treasuryTransactions: TreasuryTransaction[] = [];
+    let accountId = state.treasuryAccounts[0]?.id || '';
+    let accountToCreate: TreasuryAccount | null = null;
+    let accountBalanceDelta = 0;
+    if (!accountId) {
+      accountToCreate = {
+        id: generateId(), name: 'Main Cash', nameAr: 'الخزينة الرئيسية', type: 'cash',
+        balance: 0, currency: 'EGP', isDefault: true, createdAt: now,
+      };
+      accountId = accountToCreate.id;
+    }
+    let imported = 0;
+    let updated = 0;
+
+    rows.forEach((row, i) => {
+      const name = row.name.trim();
+      const existing = existingByName.get(name.toLowerCase());
+      const openingDebit = row.remaining + row.collected;
+      const paymentCredit = row.collected;
+      const referenceNumber = `${refBase}-${String(i + 1).padStart(3, '0')}`;
+      let customerId: string;
+      if (existing) {
+        updatedCustomers.push({
+          ...existing,
+          name, nameAr: name,
+          totalInvoiced: (existing.totalInvoiced || 0) + row.totalDebt,
+          totalPaid: (existing.totalPaid || 0) + row.collected,
+          totalDue: (existing.totalDue || 0) + row.remaining,
+          updatedAt: now,
+        });
+        customerId = existing.id;
+        updated++;
+      } else {
+        const customer: Customer = {
+          id: generateId(), name, nameAr: name, phone: '', email: '', address: '', taxNumber: '',
+          creditLimit: 0,
+          totalInvoiced: row.totalDebt, totalPaid: row.collected, totalDue: row.remaining,
+          customPricingRules: [], createdAt: now, updatedAt: now,
+        };
+        newCustomers.push(customer);
+        customerId = customer.id;
+        imported++;
+      }
+      if (openingDebit > 0 || paymentCredit > 0) {
+        statements.push({
+          id: generateId(), customerId, date: today, type: 'opening_balance',
+          referenceNumber,
+          description: `${openingBalanceLabel} - ${name}`,
+          descriptionAr: `${openingBalanceLabel} - ${name}`,
+          debit: openingDebit, credit: 0, balance: 0, createdAt: now,
+        });
+      }
+      if (paymentCredit > 0) {
+        statements.push({
+          id: generateId(), customerId, date: today, type: 'payment',
+          referenceNumber,
+          description: `${paymentReceivedLabel} - ${name}`,
+          descriptionAr: `${paymentReceivedLabel} - ${name}`,
+          debit: 0, credit: paymentCredit, balance: 0, createdAt: now,
+        });
+        treasuryTransactions.push({
+          id: generateId(), type: 'income', amount: paymentCredit, date: today,
+          accountId, fromAccountId: null, toAccountId: null,
+          paymentMethod: 'cash', paymentMethodDetail: cashLabel,
+          categoryId: '',
+          description: `${name} - ${treasuryNote}`,
+          descriptionAr: `${name} - ${treasuryNote}`,
+          referenceNumber, receiptUrl: '',
+          linkedInvoiceId: null, linkedPOId: null, linkedReturnId: null,
+          isRecurring: false, recurringPattern: null, nextOccurrence: null,
+          isReconciled: false, reconciledAt: null,
+          createdAt: now, updatedAt: now,
+        });
+        accountBalanceDelta += paymentCredit;
+      }
+    });
+
+    const auditLog: AuditLog = {
+      id: generateId(), timestamp: now, user: 'Admin', action: 'created',
+      module: 'customers', recordId: `${imported} imported, ${updated} updated`,
+      oldValues: null, newValues: { count: rows.length, imported, updated },
+      ip: '', createdAt: now,
+    };
+
+    const updatedIds = new Set(updatedCustomers.map(c => c.id));
+    set((state) => ({
+      customers: [
+        ...newCustomers,
+        ...state.customers.map(c => updatedIds.has(c.id) ? updatedCustomers.find(u => u.id === c.id)! : c),
+      ],
+      customerStatements: [...statements, ...state.customerStatements],
+      treasuryTransactions: [...treasuryTransactions, ...state.treasuryTransactions],
+      treasuryAccounts: accountToCreate
+        ? [{ ...accountToCreate, balance: accountBalanceDelta }, ...state.treasuryAccounts]
+        : state.treasuryAccounts.map(a => a.id === accountId ? { ...a, balance: (a.balance || 0) + accountBalanceDelta } : a),
+      auditLogs: [auditLog, ...state.auditLogs].slice(0, 5000),
+    }));
+
+    if (isSupabaseConfigured) {
+      try {
+        const supabase = getSupabase();
+        const BATCH_SIZE = 50;
+        const upsertTable = async (table: string, arr: any[]) => {
+          if (arr.length === 0) return;
+          for (let i = 0; i < arr.length; i += BATCH_SIZE) {
+            const batch = arr.slice(i, i + BATCH_SIZE).map((r: any) => {
+              const { customPricingRules, ...rest } = r;
+              return camelToSnake(rest);
+            });
+            const { error } = await (supabase as any).from(table).upsert(batch, { onConflict: 'id' });
+            if (error) console.error(`Batch upsert ${table} failed:`, error);
+          }
+        };
+        await upsertTable('customers', [...newCustomers, ...updatedCustomers]);
+        await upsertTable('customer_statements', statements);
+        await upsertTable('treasury_transactions', treasuryTransactions);
+        if (accountToCreate) {
+          await upsertTable('treasury_accounts', [{ ...accountToCreate, balance: accountBalanceDelta }]);
+        } else if (accountBalanceDelta !== 0) {
+          const acc = get().treasuryAccounts.find(a => a.id === accountId);
+          if (acc) await upsertTable('treasury_accounts', [{ ...acc, balance: (acc.balance || 0) + accountBalanceDelta }]);
+        }
+        await upsertTable('audit_logs', [auditLog]);
+      } catch (e) {
+        console.error('Bulk customer import sync failed:', e);
+      }
+    }
+    return { imported, updated };
   },
   updateProduct: (id, data) => {
     const old = get().products.find(p => p.id === id);

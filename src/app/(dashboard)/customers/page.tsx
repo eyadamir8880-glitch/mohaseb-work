@@ -150,99 +150,28 @@ export default function CustomersPage() {
     setParsedRows(prev => prev.map(r => r.valid ? { ...r, selected: !allSelected } : r));
   };
 
-  const executeImport = () => {
+  const executeImport = async () => {
     const selected = parsedRows.filter(r => r.selected);
     if (selected.length === 0) return;
-    const today = new Date().toISOString().split('T')[0];
-    const refBase = `IMP-${today.replace(/-/g, '')}`;
-    let imported = 0;
-    let updated = 0;
-    const errors: string[] = [];
-    selected.forEach((row, i) => {
-      try {
-        const name = row.name.trim();
-        const existing = customers.find(c => (c.name || '').toLowerCase().trim() === name.toLowerCase() || (c.nameAr || '').toLowerCase().trim() === name.toLowerCase());
-        const openingDebit = row.remaining + row.collected;
-        const paymentCredit = row.collected;
-        const referenceNumber = `${refBase}-${String(i + 1).padStart(3, '0')}`;
-        let customerId: string;
-        if (existing) {
-          store.updateCustomer(existing.id, {
-            name, nameAr: name,
-            totalInvoiced: (existing.totalInvoiced || 0) + row.totalDebt,
-            totalPaid: (existing.totalPaid || 0) + row.collected,
-            totalDue: (existing.totalDue || 0) + row.remaining,
-          });
-          customerId = existing.id;
-          updated++;
-        } else {
-          const cust = store.addCustomer({
-            name, nameAr: name, phone: '', email: '', address: '', taxNumber: '',
-            creditLimit: 0,
-            totalInvoiced: row.totalDebt, totalPaid: row.collected, totalDue: row.remaining,
-            customPricingRules: [],
-          });
-          customerId = cust.id;
-          imported++;
+    setImporting(true);
+    try {
+      const method = [...store.paymentMethods, ...PAYMENT_METHODS].find(p => p.id === 'cash');
+      const result = await store.importCustomers(
+        selected.map(r => ({ name: r.name, totalDebt: r.totalDebt, collected: r.collected, remaining: r.remaining })),
+        {
+          openingBalanceLabel: t('customerImport.openingBalance'),
+          paymentReceivedLabel: t('customerImport.paymentReceived'),
+          treasuryNote: t('customerImport.treasuryNote'),
+          cashLabel: method ? (method.nameAr || method.name) : 'cash',
         }
-        if (openingDebit > 0 || paymentCredit > 0) {
-          store.addCustomerStatement({
-            customerId,
-            date: today,
-            type: 'opening_balance',
-            referenceNumber,
-            description: `${t('customerImport.openingBalance')} - ${name}`,
-            descriptionAr: `${t('customerImport.openingBalance')} - ${name}`,
-            debit: openingDebit,
-            credit: 0,
-            balance: 0,
-          });
-        }
-        if (paymentCredit > 0) {
-          store.addCustomerStatement({
-            customerId,
-            date: today,
-            type: 'payment',
-            referenceNumber,
-            description: `${t('customerImport.paymentReceived')} - ${name}`,
-            descriptionAr: `${t('customerImport.paymentReceived')} - ${name}`,
-            debit: 0,
-            credit: paymentCredit,
-            balance: 0,
-          });
-          let accountId = '';
-          const defaultAcc = store.treasuryAccounts[0];
-          if (defaultAcc) accountId = defaultAcc.id;
-          else {
-            const acc = store.addTreasuryAccount({
-              name: 'Main Cash', nameAr: 'الخزينة الرئيسية', type: 'cash',
-              balance: 0, currency: 'EGP', isDefault: true,
-            });
-            accountId = acc.id;
-          }
-          const method = [...store.paymentMethods, ...PAYMENT_METHODS].find(p => p.id === 'cash');
-          const treasuryDesc = `${name} - ${t('customerImport.treasuryNote')}`;
-          store.addTreasuryTransaction({
-            type: 'income', amount: paymentCredit, date: today,
-            accountId,
-            fromAccountId: null, toAccountId: null,
-            paymentMethod: 'cash',
-            paymentMethodDetail: method ? (method.nameAr || method.name) : 'cash',
-            categoryId: '', description: treasuryDesc, descriptionAr: treasuryDesc,
-            referenceNumber,
-            receiptUrl: '', linkedInvoiceId: null, linkedPOId: null, linkedReturnId: null,
-            isRecurring: false, recurringPattern: null, nextOccurrence: null,
-            isReconciled: false, reconciledAt: null,
-          });
-          const account = store.treasuryAccounts.find(a => a.id === accountId);
-          if (account) store.updateTreasuryAccount(accountId, { balance: (account.balance || 0) + paymentCredit });
-        }
-      } catch (e: any) {
-        errors.push(`${row.name}: ${e.message}`);
-      }
-    });
-    setImportResult({ imported, updated, skipped: parsedRows.length - selected.length, errors });
-    setImportStep('result');
+      );
+      setImportResult({ imported: result.imported, updated: result.updated, skipped: parsedRows.length - selected.length, errors: [] });
+    } catch (e: any) {
+      setImportResult({ imported: 0, updated: 0, skipped: parsedRows.length - selected.length, errors: [e.message] });
+    } finally {
+      setImporting(false);
+      setImportStep('result');
+    }
   };
 
   return (
@@ -397,9 +326,9 @@ export default function CustomersPage() {
                   </table>
                 </div>
                 <div className="flex justify-end gap-2">
-                  <Button variant="outline" onClick={() => { setImportStep('upload'); setParsedRows([]); }}>{t('import.importAnother')}</Button>
-                  <Button onClick={executeImport} disabled={!parsedRows.some(r => r.selected)}>
-                    {t('import.importSelected')} ({parsedRows.filter(r => r.selected).length})
+                  <Button variant="outline" disabled={importing} onClick={() => { setImportStep('upload'); setParsedRows([]); }}>{t('import.importAnother')}</Button>
+                  <Button onClick={executeImport} disabled={importing || !parsedRows.some(r => r.selected)}>
+                    {importing ? t('import.processing') : `${t('import.importSelected')} (${parsedRows.filter(r => r.selected).length})`}
                   </Button>
                 </div>
               </div>
