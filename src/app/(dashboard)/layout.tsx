@@ -3,6 +3,7 @@
 import { Sidebar } from '@/components/layout/sidebar';
 import { Header } from '@/components/layout/header';
 import { ThemeProvider, LanguageProvider, ToastProvider, ApiProvider } from '@/providers';
+import { AIChatWidget } from '@/components/ai/ai-chat-widget';
 import { useAppStore } from '@/stores/use-app-store';
 import { useEffect } from 'react';
 
@@ -18,6 +19,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         <main className="p-4 sm:p-6">
           {children}
         </main>
+        <AIChatWidget />
       </div>
     </div>
   );

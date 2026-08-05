@@ -9,9 +9,11 @@ import { Badge } from '@/components/ui/badge';
 import { Select } from '@/components/ui/select';
 import { Modal } from '@/components/ui/modal';
 import { formatCurrency, formatDate, getStatusColor, generateId, generateNumber, downloadAsExcel } from '@/lib/utils';
-import { Plus, Search, Eye, Trash2, Wallet, Receipt, X, Printer } from 'lucide-react';
+import { Plus, Search, Eye, Trash2, Wallet, Receipt, X, Printer, Sparkles } from 'lucide-react';
 import { PAYMENT_METHODS } from '@/lib/constants';
 import type { Invoice, InvoiceItem, Customer, Product } from '@/lib/types';
+import { InvoiceAIPanel, type ResolvedInvoiceForm } from '@/components/ai/invoice-ai-panel';
+import { useToast } from '@/providers/toast-provider';
 
 const statusFilters = ['all', 'draft', 'sent', 'paid', 'partially_paid', 'overdue', 'cancelled', 'partially_returned', 'fully_returned'] as const;
 
@@ -19,6 +21,8 @@ export default function InvoicesPage() {
   const { t, locale } = useLanguage();
   const store = useAppStore();
   const { invoices, customers, products, paymentMethods, recordPayment, addInvoice } = store;
+  const { showToast } = useToast();
+  const [showAIAssistant, setShowAIAssistant] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [showDeleteAll, setShowDeleteAll] = useState(false);
@@ -60,6 +64,7 @@ export default function InvoicesPage() {
 
   const openCreateModal = () => {
     resetCreateForm();
+    setShowAIAssistant(false);
     setShowCreateModal(true);
   };
 
@@ -144,6 +149,21 @@ export default function InvoicesPage() {
     const c = customers.find(c => c.id === customerId);
     return c ? (locale === 'ar' ? c.nameAr || c.name : c.name) : '-';
   }
+
+  const handleApplyDraft = (form: ResolvedInvoiceForm) => {
+    setCreateForm((prev) => ({
+      ...prev,
+      customerId: form.customerId,
+      items: form.items,
+      notes: form.notes,
+    }));
+    setShowAIAssistant(false);
+    showToast({
+      title: t('ai.applied'),
+      description: t('ai.appliedDesc'),
+      variant: 'success',
+    });
+  };
 
   const filtered = useMemo(() => {
     return invoices.filter((inv) => {
@@ -485,8 +505,21 @@ export default function InvoicesPage() {
         </div>
       )}
 
-      <Modal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} title={t('invoices.addNew')} size="full">
+      <Modal isOpen={showCreateModal} onClose={() => { setShowCreateModal(false); setShowAIAssistant(false); }} title={t('invoices.addNew')} size="full">
         <div className="space-y-4">
+          <div className="flex justify-end">
+            <Button variant={showAIAssistant ? 'primary' : 'outline'} size="sm" onClick={() => setShowAIAssistant(!showAIAssistant)} className="gap-2">
+              <Sparkles className="h-4 w-4" />
+              {t('ai.invoiceTitle')}
+            </Button>
+          </div>
+
+          {showAIAssistant && (
+            <div className="rounded-xl border p-3" style={{ height: 'min(60vh, 520px)' }}>
+              <InvoiceAIPanel onApplyDraft={handleApplyDraft} compact />
+            </div>
+          )}
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input label={t('invoices.invoiceNumber')} value={createForm.invoiceNumber}
               onChange={(e) => setCreateForm({ ...createForm, invoiceNumber: e.target.value })} />
