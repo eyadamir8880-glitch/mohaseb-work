@@ -27,6 +27,7 @@ export const DEFAULT_SETTINGS = {
   defaultTaxRate: 14,
   invoiceTerms: 'Payment due within 30 days',
   invoiceTermsAr: 'الدفع مستحق خلال 30 يوماً',
+  aiModel: 'gemini-3.6-flash',
 
   defaultWarehouseId: '',
   lowStockThreshold: 10,

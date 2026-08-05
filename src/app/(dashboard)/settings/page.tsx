@@ -5,6 +5,7 @@ import { useLanguage } from '@/providers/language-provider';
 import { useTheme } from '@/providers/theme-provider';
 import { useAppStore } from '@/stores/use-app-store';
 import { downloadAsJson, formatDate } from '@/lib/utils';
+import { AI_MODELS, AI_DEFAULT_MODEL } from '@/lib/ai-models';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
@@ -84,6 +85,7 @@ export default function SettingsPage() {
           <TabsTrigger value="company">{t('settings.company')}</TabsTrigger>
           <TabsTrigger value="invoice">{t('settings.invoice')}</TabsTrigger>
           <TabsTrigger value="payment">{t('settings.paymentMethods')}</TabsTrigger>
+          <TabsTrigger value="ai">{t('settings.aiAssistant')}</TabsTrigger>
           <TabsTrigger value="data">{t('settings.dataManagement')}</TabsTrigger>
           <TabsTrigger value="import">{t('settings.importHistory')}</TabsTrigger>
         </TabsList>
@@ -146,6 +148,25 @@ export default function SettingsPage() {
                 store.addNotification({ type: 'system', title: 'Payment Method Added', titleAr: 'تم إضافة طريقة الدفع', message: `${newPmName} has been added`, messageAr: `تم إضافة ${newPmName}`, module: 'settings', recordId: '', isRead: false, readAt: null });
               }
             }}>Add</Button>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="ai" className="mt-4 space-y-4">
+          <div className="card max-w-xl">
+            <h3 className="card-title mb-2">{t('settings.aiAssistant')}</h3>
+            <p className="mb-4 text-sm text-slate-500">{t('settings.aiModelHint')}</p>
+            <Select
+              label={t('settings.aiModel')}
+              value={getSetting('aiModel') || AI_DEFAULT_MODEL}
+              onChange={(e) => updateSetting('aiModel', e.target.value)}
+              options={AI_MODELS.map((m) => ({ value: m.id, label: m.label }))}
+            />
+            {(() => {
+              const selected = AI_MODELS.find((m) => m.id === (getSetting('aiModel') || AI_DEFAULT_MODEL));
+              return selected?.note ? (
+                <p className="mt-2 text-xs text-muted-foreground">{selected.note}</p>
+              ) : null;
+            })()}
           </div>
         </TabsContent>
 

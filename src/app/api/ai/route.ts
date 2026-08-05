@@ -1,10 +1,14 @@
 import { NextResponse } from 'next/server';
+import { AI_DEFAULT_MODEL } from '@/lib/ai-models';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-const MODEL = process.env.GEMINI_MODEL || 'gemini-flash-latest';
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
+const MODEL = process.env.GEMINI_MODEL || AI_DEFAULT_MODEL;
+
+function geminiUrl(model: string) {
+  return `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
+}
 
 interface AttachmentPayload {
   name: string;
@@ -123,7 +127,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'AI is not configured. Add GEMINI_API_KEY.' }, { status: 500 });
   }
 
-  let body: { mode?: string; language?: string; messages?: MessagePayload[]; context?: any };
+  let body: { mode?: string; language?: string; messages?: MessagePayload[]; context?: any; model?: string };
   try {
     body = await request.json();
   } catch {
@@ -134,6 +138,7 @@ export async function POST(request: Request) {
   const language = body.language === 'ar' ? 'ar' : 'en';
   const messages = Array.isArray(body.messages) ? body.messages : [];
   const context = body.context || {};
+  const model = body.model && /^[A-Za-z0-9._-]+$/.test(body.model) ? body.model : MODEL;
 
   const systemPrompt = buildSystemPrompt(mode, language, context);
 
@@ -171,7 +176,7 @@ export async function POST(request: Request) {
 
   let geminiRes: Response;
   try {
-    geminiRes = await fetch(`${GEMINI_URL}?key=${apiKey}`, {
+    geminiRes = await fetch(`${geminiUrl(model)}?key=${apiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ contents, generationConfig }),

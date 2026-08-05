@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AIAttachment, AIMessage, AIMode, AIServerResponse, InvoiceDraft, NewCustomerDraft, NewProductDraft } from '@/lib/ai-types';
+import { useAppStore } from '@/stores/use-app-store';
 
 interface HistoryEntry {
   role: 'user' | 'assistant';
@@ -90,11 +91,13 @@ export function useAIChat(mode: AIMode) {
       setLoading(true);
 
       try {
+        const aiModel = useAppStore.getState().settings.find((s) => s.key === 'aiModel')?.value || '';
         const res = await fetch('/api/ai', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             mode,
+            model: aiModel,
             language: payload.language,
             messages: [
               ...messages.map((m) => ({

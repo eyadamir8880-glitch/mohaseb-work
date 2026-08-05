@@ -427,6 +427,9 @@ const en = {
     exportAll: 'Export All Data',
     importHistory: 'Import History',
     resetDemo: 'Reset Demo Data',
+    aiAssistant: 'AI Assistant',
+    aiModel: 'AI Model',
+    aiModelHint: 'Choose which Gemini model the AI uses. Free-tier limits differ per model — if you hit a limit, try Flash Lite.',
   },
 
   auditLog: {
