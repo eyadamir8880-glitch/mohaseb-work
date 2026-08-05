@@ -27,7 +27,7 @@ export default function ProductsPage() {
   const [importStep, setImportStep] = useState<'upload' | 'preview' | 'result'>('upload');
   const [importing, setImporting] = useState(false);
   const [parsedRows, setParsedRows] = useState<{
-    sku: string; name: string; price: number; stock: number; valid: boolean; reason: string; selected: boolean; rowIndex: number;
+    sku: string; name: string; price: number; stock: number; serial: number; valid: boolean; reason: string; selected: boolean; rowIndex: number;
   }[]>([]);
   const [importResult, setImportResult] = useState<{ imported: number; skipped: number; errors: string[] } | null>(null);
   const [form, setForm] = useState({
@@ -137,6 +137,8 @@ export default function ProductsPage() {
       const sheet = workbook.Sheets[workbook.SheetNames[0]];
       const rows: any[] = XLSX.utils.sheet_to_json(sheet);
       const existingSkus = new Set(products.map(p => p.sku.toLowerCase()));
+      const existingSerials = new Set(products.map(p => p.serialNumber).filter(n => n != null));
+      const fileSerials = new Set<number>();
       const parsed = rows.map((row, i) => {
         const rawSku = getCol(row, 'product number', 'product_number', 'sku', 'productNumber', 'item number', 'item_number');
         const sku = rawSku ? rawSku.replace(/\r?\n/g, ', ').trim() : '';
@@ -145,13 +147,19 @@ export default function ProductsPage() {
         const price = parseFloat(rawPrice) || 0;
         const rawStock = getCol(row, 'stock', 'quantity', 'qty', 'opening_stock', 'openingStock').replace(/[^0-9.]/g, '');
         const stock = parseFloat(rawStock) || 0;
+        const rawSerial = getCol(row, 'serial', 'serial number', 'serial_number', 'no', 'number', '#');
+        const serial = rawSerial ? parseInt(rawSerial.replace(/[^0-9]/g, ''), 10) || 0 : 0;
         let valid = true;
         let reason = '';
         if (!sku) { valid = false; reason = t('import.missingSku'); }
         else if (!name) { valid = false; reason = t('import.missingName'); }
         else if (!rawPrice) { valid = false; reason = t('import.missingPrice'); }
         else if (existingSkus.has(sku.toLowerCase())) { valid = false; reason = t('import.duplicateSku'); }
-        return { sku, name, price, stock, valid, reason, selected: valid, rowIndex: i };
+        if (valid && serial > 0) {
+          if (existingSerials.has(serial) || fileSerials.has(serial)) { valid = false; reason = t('import.duplicateSerial'); }
+          else fileSerials.add(serial);
+        }
+        return { sku, name, price, stock, serial, valid, reason, selected: valid, rowIndex: i };
       });
       setParsedRows(parsed);
       setImportStep('preview');
@@ -175,27 +183,23 @@ export default function ProductsPage() {
   const executeImport = () => {
     const selected = parsedRows.filter(r => r.selected);
     if (selected.length === 0) return;
+    const toProduct = (row: typeof parsedRows[0]) => ({
+      name: row.name, nameAr: '', sku: row.sku, barcode: '', description: '', descriptionAr: '',
+      categoryId: '', purchasePrice: 0, sellingPrice: row.price,
+      unitOfMeasure: 'piece', baseUnit: 'piece', conversionRate: 1,
+      trackInventory: true, stock: row.stock, lowStockThreshold: 0, reorderPoint: 0,
+      imageUrl: '', hasVariants: false, alternateSkus: [],
+      serialNumber: row.serial > 0 ? row.serial : undefined,
+    });
     if (selected.length > 50) {
-      store.bulkAddProducts(selected.map(row => ({
-        name: row.name, nameAr: '', sku: row.sku, barcode: '', description: '', descriptionAr: '',
-        categoryId: '', purchasePrice: 0, sellingPrice: row.price,
-        unitOfMeasure: 'piece', baseUnit: 'piece', conversionRate: 1,
-        trackInventory: true, stock: row.stock, lowStockThreshold: 0, reorderPoint: 0,
-        imageUrl: '', hasVariants: false, alternateSkus: [],
-      })));
+      store.bulkAddProducts(selected.map(toProduct));
       setImportResult({ imported: selected.length, skipped: parsedRows.length - selected.length, errors: [] });
       setImportStep('result');
       return;
     }
     for (const row of selected) {
       try {
-        store.addProduct({
-          name: row.name, nameAr: '', sku: row.sku, barcode: '', description: '', descriptionAr: '',
-          categoryId: '', purchasePrice: 0, sellingPrice: row.price,
-          unitOfMeasure: 'piece', baseUnit: 'piece', conversionRate: 1,
-          trackInventory: true, stock: row.stock, lowStockThreshold: 0, reorderPoint: 0,
-          imageUrl: '', hasVariants: false, alternateSkus: [],
-        });
+        store.addProduct(toProduct(row));
       } catch (e: any) {
         setImportResult({ imported: 0, skipped: 0, errors: [`${row.sku}: ${e.message}`] });
         setImportStep('result');
@@ -479,6 +483,7 @@ export default function ProductsPage() {
                     <li>{t('import.itemNumber')} ({t('import.productNumber')})</li>
                     <li>{t('import.productName')}</li>
                     <li>{t('import.price')} ({t('import.sellingPrice')})</li>
+                    <li>{t('import.serial')}</li>
                   </ul>
                 </div>
                 {importing && <p className="text-sm text-center text-primary">{t('import.processing')}</p>}
@@ -506,6 +511,7 @@ export default function ProductsPage() {
                         <th className="w-10 p-2 text-center">
                           <input type="checkbox" checked={parsedRows.filter(r => r.valid).every(r => r.selected)} onChange={toggleSelectAll} className="h-4 w-4" />
                         </th>
+                        <th className="text-center p-2">#</th>
                         <th className="text-left p-2">SKU</th>
                         <th className="text-left p-2">{t('import.productName')}</th>
                         <th className="text-right p-2">{t('import.price')}</th>
@@ -519,6 +525,7 @@ export default function ProductsPage() {
                             <input type="checkbox" checked={row.selected} disabled={!row.valid}
                               onChange={() => toggleRow(i)} className="h-4 w-4" />
                           </td>
+                          <td className="p-2 text-center font-mono text-xs">{row.serial > 0 ? row.serial : '-'}</td>
                           <td className="p-2 font-mono text-xs">{row.sku || '-'}</td>
                           <td className="p-2">{row.name || '-'}</td>
                           <td className="p-2 text-right">{row.price > 0 ? formatCurrency(row.price, 'EGP', language) : '-'}</td>
