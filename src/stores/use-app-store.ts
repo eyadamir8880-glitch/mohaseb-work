@@ -1238,9 +1238,15 @@ export const useAppStore = create<AppStore>()(
   },
 
   updateSetting: (key, value) => {
-    set((state) => ({ settings: state.settings.map(s => s.key === key ? { ...s, value, updatedAt: new Date().toISOString() } : s) }));
-    const setting = get().settings.find(s => s.key === key);
-    if (setting) syncToSupabase('put', 'settings', setting);
+    if (get().settings.some(s => s.key === key)) {
+      set((state) => ({ settings: state.settings.map(s => s.key === key ? { ...s, value, updatedAt: new Date().toISOString() } : s) }));
+      const setting = get().settings.find(s => s.key === key);
+      if (setting) syncToSupabase('put', 'settings', setting);
+    } else {
+      const setting: Setting = { id: generateId(), key, value, updatedAt: new Date().toISOString() };
+      set((state) => ({ settings: [...state.settings, setting] }));
+      syncToSupabase('post', 'settings', setting);
+    }
   },
 
   addImportSession: (session) => {
