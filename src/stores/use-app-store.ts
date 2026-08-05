@@ -61,7 +61,6 @@ interface AppStore {
   addProduct: (product: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>) => Product;
   bulkAddProducts: (dataArr: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>[]) => Product[] | Promise<Product[]>;
   updateProduct: (id: string, data: Partial<Product>) => void;
-  backfillProductSerials: () => void;
   deleteProduct: (id: string) => void;
 
   addCategory: (category: Omit<Category, 'id' | 'createdAt'>) => Category;
@@ -358,8 +357,6 @@ export const useAppStore = create<AppStore>()(
           lastSaveTime: Date.now(),
         } as any);
 
-        get().backfillProductSerials();
-
         get().addAuditLog({
           timestamp: new Date().toISOString(), user: 'System', action: 'created',
           module: 'system', recordId: 'init', oldValues: null,
@@ -382,7 +379,6 @@ export const useAppStore = create<AppStore>()(
         isInitialized: true,
       } as any);
     }
-    get().backfillProductSerials();
   },
 
   resetToDemo: () => {
@@ -584,22 +580,14 @@ export const useAppStore = create<AppStore>()(
   },
 
   addProduct: (data) => {
-    const maxSerial = get().products.reduce((m, p) => Math.max(m, p.serialNumber || 0), 0);
-    const product: Product = { ...data, serialNumber: data.serialNumber && data.serialNumber > 0 ? data.serialNumber : maxSerial + 1, id: generateId(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    const product: Product = { ...data, serialNumber: data.serialNumber && data.serialNumber > 0 ? data.serialNumber : undefined, id: generateId(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
     set((state) => ({ products: [product, ...state.products] }));
     get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'created', module: 'products', recordId: product.id, oldValues: null, newValues: data, ip: '' });
     syncToSupabase('post', 'products', product);
     return product;
   },
   bulkAddProducts: async (dataArr) => {
-    let maxSerial = get().products.reduce((m, p) => Math.max(m, p.serialNumber || 0), 0);
-    const products = dataArr.map(data => {
-      if (data.serialNumber && data.serialNumber > 0) {
-        maxSerial = Math.max(maxSerial, data.serialNumber);
-        return { ...data, serialNumber: data.serialNumber, id: generateId(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } as Product;
-      }
-      return { ...data, serialNumber: ++maxSerial, id: generateId(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } as Product;
-    });
+    const products = dataArr.map(data => ({ ...data, serialNumber: data.serialNumber && data.serialNumber > 0 ? data.serialNumber : undefined, id: generateId(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() } as Product));
     set((state) => ({ products: [...products, ...state.products] }));
     get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'created', module: 'products', recordId: `${products.length} bulk`, oldValues: null, newValues: { count: products.length }, ip: '' });
     if (isSupabaseConfigured) {
@@ -632,30 +620,6 @@ export const useAppStore = create<AppStore>()(
     set((state) => ({ products: state.products.map(p => p.id === id ? { ...p, ...data, updatedAt: new Date().toISOString() } : p) }));
     get().addAuditLog({ timestamp: new Date().toISOString(), user: 'Admin', action: 'updated', module: 'products', recordId: id, oldValues: old, newValues: data, ip: '' });
     syncToSupabase('put', 'products', { id, ...data });
-  },
-  backfillProductSerials: () => {
-    const state = get();
-    const missing = state.products.filter(p => p.serialNumber === undefined || p.serialNumber === null);
-    if (missing.length === 0) return;
-    const sorted = [...state.products].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-    let next = state.products.reduce((m, p) => Math.max(m, p.serialNumber || 0), 0);
-    const byId: Record<string, number> = {};
-    for (const p of sorted) {
-      if (p.serialNumber === undefined || p.serialNumber === null) {
-        next += 1;
-        byId[p.id] = next;
-      }
-    }
-    set((s: any) => ({ products: s.products.map((p: any) => (byId[p.id] ? { ...p, serialNumber: byId[p.id] } : p)) }));
-    if (isSupabaseConfigured) {
-      try {
-        const supabase = getSupabase();
-        const rows = Object.entries(byId).map(([id, serialNumber]) => ({ id, serial_number: serialNumber }));
-        Promise.resolve((supabase as any).from('products').upsert(rows, { onConflict: 'id' }))
-          .then(({ error }: any) => { if (error) console.error('Serial backfill sync failed:', error); })
-          .catch((e: any) => console.error('Serial backfill sync failed:', e));
-      } catch {}
-    }
   },
   deleteProduct: (id) => {
     const old = get().products.find(p => p.id === id);
