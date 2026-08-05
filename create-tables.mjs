@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS customer_statements (
   id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   customer_id       uuid NOT NULL,
   date              date NOT NULL DEFAULT CURRENT_DATE,
-  type              text NOT NULL CHECK (type IN ('invoice', 'payment', 'return', 'opening_balance')),
+  type              text NOT NULL CHECK (type IN ('invoice', 'payment', 'return', 'opening_balance', 'manual')),
   reference_number  text NOT NULL DEFAULT '',
   description       text NOT NULL DEFAULT '',
   description_ar    text NOT NULL DEFAULT '',
